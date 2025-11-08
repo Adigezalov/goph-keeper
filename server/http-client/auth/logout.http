@@ -1,0 +1,21 @@
+### Logout - успешный (ожидается 200)
+# Удаляет refresh token текущего устройства из cookie и БД
+POST http://localhost:8080/api/v1/user/logout
+
+### Logout - без cookie (ожидается 200)
+# Если cookie нет, считается что logout уже выполнен
+POST http://localhost:8080/api/v1/user/logout
+
+### LogoutAll - успешный (ожидается 200)
+# Требует авторизации (access token в заголовке Authorization)
+# Удаляет все refresh токены пользователя со всех устройств
+POST http://localhost:8080/api/v1/user/logout-all
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+
+### LogoutAll - без токена (ожидается 401: "Токен авторизации отсутствует")
+POST http://localhost:8080/api/v1/user/logout-all
+
+### LogoutAll - с неверным токеном (ожидается 401: "Недействительный токен авторизации")
+POST http://localhost:8080/api/v1/user/logout-all
+Authorization: Bearer invalid_token
+

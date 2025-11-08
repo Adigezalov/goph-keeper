@@ -1,0 +1,55 @@
+### Авторизация пользователя - успешная (ожидается 200)
+# Access token возвращается в JSON теле ответа: {"access_token": "..."}
+# Refresh token устанавливается в cookie с именем "refresh_token"
+POST http://localhost:8080/api/v1/user/login
+Content-Type: application/json
+
+{
+  "email": "test@user.ru",
+  "password": "password123"
+}
+
+### Авторизация пользователя - неверный пароль (ожидается 400: "неверная пара email/пароль")
+POST http://localhost:8080/api/v1/user/login
+Content-Type: application/json
+
+{
+  "email": "test@user.ru",
+  "password": "wrongpassword"
+}
+
+### Авторизация пользователя - несуществующий email (ожидается 400: "неверная пара email/пароль")
+POST http://localhost:8080/api/v1/user/login
+Content-Type: application/json
+
+{
+  "email": "test2@user.ru",
+  "password": "password123"
+}
+
+### Авторизация пользователя - пустой email (ожидается 400: "email обязателен")
+POST http://localhost:8080/api/v1/user/login
+Content-Type: application/json
+
+{
+  "email": "",
+  "password": "password123"
+}
+
+### Авторизация пользователя - пустой пароль (ожидается 400: "пароль обязателен")
+POST http://localhost:8080/api/v1/user/login
+Content-Type: application/json
+
+{
+  "email": "test@user.ru",
+  "password": ""
+}
+
+### Авторизация пользователя - невалидный JSON (ожидается 400: "неверный формат запроса")
+POST http://localhost:8080/api/v1/user/login
+Content-Type: application/json
+
+{
+  "email": "test@user.ru",
+  "password": "password123"
+}
