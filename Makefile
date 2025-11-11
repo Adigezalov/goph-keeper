@@ -1,4 +1,4 @@
-.PHONY: help migrate-up migrate-down migrate-status build-server build-migrate build run-server run-migrate-up run-migrate-down run-migrate-status clean test deps setup start migrate-up-bin migrate-down-bin migrate-status-bin fmt vet lint client-install client-dev client-build client-lint client-tsc client-clean dev-all
+.PHONY: help migrate-up migrate-down migrate-status build-server build-migrate build run-server run-migrate-up run-migrate-down run-migrate-status clean test test-coverage test-verbose deps setup start migrate-up-bin migrate-down-bin migrate-status-bin fmt vet lint client-install client-dev client-build client-lint client-tsc client-clean dev-all
 
 # Переменные
 SERVER_DIR := server
@@ -70,6 +70,14 @@ clean: ## Удалить собранные бинарники
 test: ## Запустить тесты
 	@echo "Запуск тестов..."
 	@cd $(SERVER_DIR) && go test ./...
+
+test-coverage: ## Запустить тесты с покрытием
+	@echo "Запуск тестов с покрытием..."
+	@cd $(SERVER_DIR) && go test ./... -cover
+
+test-verbose: ## Запустить тесты в verbose режиме
+	@echo "Запуск тестов (verbose)..."
+	@cd $(SERVER_DIR) && go test ./... -v
 
 fmt: ## Форматировать код
 	@echo "Форматирование кода..."

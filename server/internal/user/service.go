@@ -8,14 +8,23 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// TokenService интерфейс для работы с токенами
+type TokenService interface {
+	GenerateTokenPair(userID int, email string) (*tokens.TokenPair, error)
+	GetRefreshToken(tokenString string) (*tokens.RefreshToken, error)
+	RefreshTokenPair(refreshTokenString string, userID int, email string) (*tokens.TokenPair, error)
+	Logout(refreshTokenString string) error
+	LogoutAll(userID int) error
+}
+
 // Service содержит бизнес-логику для пользователей
 type Service struct {
 	repo         Repository
-	tokenService *tokens.Service
+	tokenService TokenService
 }
 
 // NewService создает новый экземпляр Service
-func NewService(repo Repository, tokenService *tokens.Service) *Service {
+func NewService(repo Repository, tokenService TokenService) *Service {
 	return &Service{
 		repo:         repo,
 		tokenService: tokenService,

@@ -8,17 +8,27 @@ import (
 	"time"
 
 	"github.com/Adigezalov/goph-keeper/internal/middleware"
+	"github.com/Adigezalov/goph-keeper/internal/tokens"
 	"github.com/Adigezalov/goph-keeper/internal/utils"
 )
 
+// UserService интерфейс для бизнес-логики пользователей
+type UserService interface {
+	RegisterUser(req *RegisterRequest) (*tokens.TokenPair, error)
+	LoginUser(req *LoginRequest) (*tokens.TokenPair, error)
+	RefreshTokens(refreshTokenString string) (*tokens.TokenPair, error)
+	Logout(refreshTokenString string) error
+	LogoutAll(userID int) error
+}
+
 // Handler обрабатывает HTTP запросы для пользователей
 type Handler struct {
-	service         *Service
+	service         UserService
 	refreshTokenTTL time.Duration
 }
 
 // NewHandler создает новый экземпляр Handler
-func NewHandler(service *Service, refreshTokenTTL time.Duration) *Handler {
+func NewHandler(service UserService, refreshTokenTTL time.Duration) *Handler {
 	return &Handler{
 		service:         service,
 		refreshTokenTTL: refreshTokenTTL,
