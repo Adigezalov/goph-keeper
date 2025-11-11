@@ -1,5 +1,7 @@
 import { Outlet } from 'react-router'
 
+import { CryptoModal } from '@entities/crypto'
+
 import { Header } from '@widgets/header'
 
 import { AuthProvider } from '../providers'
@@ -15,6 +17,7 @@ export const PrivateLayout = () => {
 					<Outlet />
 				</div>
 			</div>
+			<CryptoModal />
 		</AuthProvider>
 	)
 }

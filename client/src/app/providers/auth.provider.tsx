@@ -13,11 +13,11 @@ type TProps = {
 export const AuthProvider = observer(({ children }: TProps) => {
 	const store = useStoreLogic<TStoreLogic>(StoreContextLogic)
 
-	const { auth, isCheckLoading, initStore } = store.auth
+	const { auth, isCheckLoading, initAuthStore } = store.auth
 
 	useEffect(() => {
-		initStore()
-	}, [initStore])
+		initAuthStore()
+	}, [initAuthStore])
 
 	if (isCheckLoading) return <PageLoader />
 

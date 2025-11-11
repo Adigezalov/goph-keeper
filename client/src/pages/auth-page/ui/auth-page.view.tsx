@@ -35,12 +35,23 @@ export const AuthPageView = ({
 		<div className={styles.root}>
 			<div className={styles.form}>
 				<span className={styles.form_title}>{title}</span>
-				<form className={styles.form_content} onSubmit={onLogin}>
+				<form className={styles.form_content} onSubmit={onLogin} noValidate>
 					<div className={styles.form_data}>
 						<InputTextField<TAuth>
 							control={control}
 							name="email"
 							label={t('email')}
+							rules={{
+								validate: (value) => {
+									if (value && value.trim() !== '') {
+										const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i
+										return (
+											emailRegex.test(value) || t('validation_error.invalid_email_format')
+										)
+									}
+									return true
+								},
+							}}
 							required
 							disabled={loading}
 						/>

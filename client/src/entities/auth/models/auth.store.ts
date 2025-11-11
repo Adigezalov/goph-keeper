@@ -137,7 +137,7 @@ export class AuthStore {
 		}
 	}
 
-	initStore = (): void => {
+	initAuthStore = (): void => {
 		void this.refresh()
 	}
 
