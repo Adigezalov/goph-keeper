@@ -1,0 +1,4 @@
+export enum LOCAL_TOKEN_NAME {
+	ACCESS = '@ACCESS_TOKEN',
+	REFRESH = '@REFRESH_TOKEN',
+}

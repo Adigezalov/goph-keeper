@@ -95,7 +95,7 @@ func (s *Service) ValidateAccessToken(tokenString string) (*Claims, error) {
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		if claims["type"] != "access" {
-			return nil, fmt.Errorf("неверный тип токена")
+			return nil, fmt.Errorf("Неверный тип токена")
 		}
 
 		return &Claims{
@@ -105,7 +105,7 @@ func (s *Service) ValidateAccessToken(tokenString string) (*Claims, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("недействительный токен")
+	return nil, fmt.Errorf("Недействительный токен")
 }
 
 // GetRefreshToken получает refresh токен из БД
@@ -119,12 +119,12 @@ func (s *Service) RefreshTokenPair(refreshTokenString string, userID int, email 
 	// Получаем refresh токен из БД
 	refreshToken, err := s.repo.GetRefreshToken(refreshTokenString)
 	if err != nil {
-		return nil, fmt.Errorf("недействительный refresh токен")
+		return nil, fmt.Errorf("Недействительный refresh токен")
 	}
 
 	// Проверяем, что токен принадлежит указанному пользователю
 	if refreshToken.UserID != userID {
-		return nil, fmt.Errorf("недействительный refresh токен")
+		return nil, fmt.Errorf("Недействительный refresh токен")
 	}
 
 	// Удаляем старый refresh токен
@@ -139,13 +139,13 @@ func (s *Service) RefreshTokenPair(refreshTokenString string, userID int, email 
 // Logout удаляет конкретный refresh токен
 func (s *Service) Logout(refreshTokenString string) error {
 	if refreshTokenString == "" {
-		return fmt.Errorf("refresh токен отсутствует")
+		return fmt.Errorf("Refresh токен отсутствует")
 	}
 
 	// Проверяем, что токен существует
 	_, err := s.repo.GetRefreshToken(refreshTokenString)
 	if err != nil {
-		return fmt.Errorf("недействительный refresh токен")
+		return fmt.Errorf("Недействительный refresh токен")
 	}
 
 	// Удаляем токен

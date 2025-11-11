@@ -226,9 +226,10 @@ func (s *Service) getAppliedVersions() (map[int]bool, error) {
 		return nil, err
 	}
 	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			fmt.Println("close rows err:", err)
+		if rows != nil {
+			if err := rows.Close(); err != nil {
+				fmt.Println("close rows err:", err)
+			}
 		}
 	}(rows)
 
@@ -373,9 +374,10 @@ func (s *Service) Status() ([]MigrationStatus, error) {
 		return nil, fmt.Errorf("не удалось получить список примененных миграций: %w", err)
 	}
 	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			fmt.Println("close rows:", err)
+		if rows != nil {
+			if err := rows.Close(); err != nil {
+				fmt.Println("close rows:", err)
+			}
 		}
 	}(rows)
 

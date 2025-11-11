@@ -2,9 +2,9 @@ package user
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Adigezalov/goph-keeper/internal/middleware"
@@ -47,26 +47,29 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	// Декодируем JSON запрос
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "неверный формат запроса", http.StatusBadRequest)
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
 		return
 	}
 
 	// Регистрируем пользователя
 	tokenPair, err := h.service.RegisterUser(&req)
 	if err != nil {
-		if strings.Contains(err.Error(), "пользователь уже существует") {
+		switch {
+		case errors.Is(err, ErrUserAlreadyExists):
 			http.Error(w, "Email уже занят", http.StatusConflict)
 			return
-		}
-		if strings.Contains(err.Error(), "обязателен") ||
-			strings.Contains(err.Error(), "слишком длинный") ||
-			strings.Contains(err.Error(), "минимум") ||
-			strings.Contains(err.Error(), "неверный формат email") {
+		case errors.Is(err, ErrEmailRequired),
+			errors.Is(err, ErrPasswordRequired),
+			errors.Is(err, ErrInvalidEmail),
+			errors.Is(err, ErrPasswordTooShort),
+			errors.Is(err, ErrRequestRequired):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		default:
+			log.Printf("Ошибка регистрации пользователя: %v", err)
+			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+			return
 		}
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
-		return
 	}
 
 	// Устанавливаем refresh token в cookie
@@ -82,23 +85,27 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Декодируем JSON запрос
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "неверный формат запроса", http.StatusBadRequest)
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
 		return
 	}
 
 	// Авторизуем пользователя
 	tokenPair, err := h.service.LoginUser(&req)
 	if err != nil {
-		if strings.Contains(err.Error(), "неверная пара email/пароль") {
-			http.Error(w, "неверная пара email/пароль", http.StatusBadRequest)
+		switch {
+		case errors.Is(err, ErrInvalidCredentials):
+			http.Error(w, "Неверная пара email/пароль", http.StatusBadRequest)
 			return
-		}
-		if strings.Contains(err.Error(), "обязателен") {
+		case errors.Is(err, ErrEmailRequired),
+			errors.Is(err, ErrPasswordRequired),
+			errors.Is(err, ErrRequestRequired):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		default:
+			log.Printf("Ошибка авторизации пользователя: %v", err)
+			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+			return
 		}
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
-		return
 	}
 
 	// Устанавливаем refresh token в cookie
@@ -108,32 +115,35 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	h.sendTokenResponse(w, tokenPair.AccessToken)
 }
 
-// Refresh обрабатывает POST /api/v1/user/refresh
+// Refresh обрабатывает GET /api/v1/user/refresh
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	// Получаем refresh token из cookie
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		http.Error(w, "refresh токен отсутствует", http.StatusUnauthorized)
+		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
 		return
 	}
 
 	refreshTokenString := cookie.Value
 	if refreshTokenString == "" {
-		http.Error(w, "refresh токен отсутствует", http.StatusUnauthorized)
+		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
 		return
 	}
 
 	// Обновляем токены
 	tokenPair, err := h.service.RefreshTokens(refreshTokenString)
 	if err != nil {
-		if strings.Contains(err.Error(), "недействительный refresh токен") ||
-			strings.Contains(err.Error(), "refresh токен отсутствует") ||
-			strings.Contains(err.Error(), "пользователь не найден") {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+		switch {
+		case errors.Is(err, ErrInvalidRefreshToken),
+			errors.Is(err, ErrRefreshTokenMissing),
+			errors.Is(err, ErrUserNotFound):
+			http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+			return
+		default:
+			log.Printf("Ошибка обновления токенов: %v", err)
+			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
 			return
 		}
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
-		return
 	}
 
 	// Устанавливаем новый refresh token в cookie
@@ -143,7 +153,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	h.sendTokenResponse(w, tokenPair.AccessToken)
 }
 
-// Logout обрабатывает POST /api/v1/user/logout
+// Logout обрабатывает GET /api/v1/user/logout
 // Удаляет refresh токен текущего устройства из cookie и БД
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	// Получаем refresh token из cookie
@@ -172,12 +182,12 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// LogoutAll обрабатывает POST /api/v1/user/logout-all
+// LogoutAll обрабатывает GET /api/v1/user/logout-all
 func (h *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	// Получаем userID из контекста
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, "Токен авторизации отсутствует", http.StatusUnauthorized)
+		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
 		return
 	}
 

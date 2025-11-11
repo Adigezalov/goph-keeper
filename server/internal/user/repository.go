@@ -2,7 +2,9 @@ package user
 
 import (
 	"database/sql"
-	"fmt"
+	"errors"
+
+	"github.com/lib/pq"
 )
 
 // Repository интерфейс для работы с пользователями в БД
@@ -29,11 +31,16 @@ func (r *DatabaseRepository) CreateUser(user *User) error {
 		VALUES ($1, $2)
 		RETURNING id, created_at, updated_at`
 
-	err := r.db.QueryRow(query, user.PasswordHash, user.Email).Scan(
+	err := r.db.QueryRow(query, user.Email, user.PasswordHash).Scan(
 		&user.ID, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("не удалось создать пользователя: %w", err)
+		// Проверяем, является ли ошибка нарушением уникального ограничения
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" { // unique_violation
+			return ErrUserAlreadyExists
+		}
+		return WrapError(err, "не удалось создать пользователя")
 	}
 
 	return nil
@@ -51,10 +58,10 @@ func (r *DatabaseRepository) GetUserByEmail(email string) (*User, error) {
 		&user.ID, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("пользователь не найден")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrUserNotFound
 		}
-		return nil, fmt.Errorf("не удалось получить пользователя: %w", err)
+		return nil, WrapError(err, "не удалось получить пользователя")
 	}
 
 	return user, nil
@@ -72,10 +79,10 @@ func (r *DatabaseRepository) GetUserByID(id int) (*User, error) {
 		&user.ID, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("пользователь не найден")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrUserNotFound
 		}
-		return nil, fmt.Errorf("не удалось получить пользователя: %w", err)
+		return nil, WrapError(err, "не удалось получить пользователя")
 	}
 
 	return user, nil

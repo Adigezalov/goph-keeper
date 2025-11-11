@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Adigezalov/goph-keeper/internal/config"
-	"github.com/Adigezalov/goph-keeper/internal/health"
 	"github.com/Adigezalov/goph-keeper/internal/middleware"
 	"github.com/Adigezalov/goph-keeper/internal/repositories"
 	"github.com/Adigezalov/goph-keeper/internal/tokens"
@@ -35,21 +35,9 @@ func main() {
 	// Создаем роутер
 	router := mux.NewRouter()
 
-	// Создаем health домен
-	var healthRepo health.Repository
-	if dbRepo != nil {
-		healthRepo = dbRepo
-	}
-	healthService := health.NewService(healthRepo)
-	healthHandler := health.NewHandler(healthService)
-
 	// Настраиваем маршруты
 	api := router.PathPrefix("/api").Subrouter()
 
-	// Health check маршруты
-	healthRoutes := api.PathPrefix("/v1/health").Subrouter()
-	healthRoutes.HandleFunc("/check", healthHandler.Check).Methods("GET")
-	healthRoutes.HandleFunc("/db", healthHandler.CheckDatabase).Methods("GET")
 	log.Println("Зарегистрированы публичные health check маршруты")
 
 	// Контекст для управления жизненным циклом приложения
@@ -75,11 +63,10 @@ func main() {
 		userRoutes := api.PathPrefix("/v1/user").Subrouter()
 		userRoutes.HandleFunc("/register", userHandler.Register).Methods("POST")
 		userRoutes.HandleFunc("/login", userHandler.Login).Methods("POST")
-		userRoutes.HandleFunc("/refresh", userHandler.Refresh).Methods("POST")
-		userRoutes.HandleFunc("/logout", userHandler.Logout).Methods("POST")
-		userRoutes.HandleFunc("/logout-all", authMiddleware.RequireAuth(userHandler.LogoutAll)).Methods("POST")
+		userRoutes.HandleFunc("/refresh", userHandler.Refresh).Methods("GET")
+		userRoutes.HandleFunc("/logout", userHandler.Logout).Methods("GET")
+		userRoutes.HandleFunc("/logout-all", authMiddleware.RequireAuth(userHandler.LogoutAll)).Methods("GET")
 
-		healthRoutes.HandleFunc("/auth", authMiddleware.RequireAuth(healthHandler.CheckAuth)).Methods("GET")
 		log.Println("Зарегистрированы пользовательские и защищенные маршруты")
 	}
 
@@ -98,7 +85,7 @@ func main() {
 		log.Printf("Сервер запущен на %s", cfg.ServerAddress)
 		log.Printf("База данных: %s", cfg.DatabaseURI)
 
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Ошибка запуска сервера: %v", err)
 		}
 	}()

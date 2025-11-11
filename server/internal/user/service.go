@@ -2,9 +2,7 @@ package user
 
 import (
 	"errors"
-	"fmt"
 	"net/mail"
-	"strings"
 
 	"github.com/Adigezalov/goph-keeper/internal/tokens"
 	"golang.org/x/crypto/bcrypt"
@@ -34,13 +32,13 @@ func (s *Service) RegisterUser(req *RegisterRequest) (*tokens.TokenPair, error) 
 	// Проверяем, не существует ли уже пользователь с таким email
 	existingUser, err := s.repo.GetUserByEmail(req.Email)
 	if err == nil && existingUser != nil {
-		return nil, fmt.Errorf("пользователь уже существует")
+		return nil, ErrUserAlreadyExists
 	}
 
 	// Хешируем пароль
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось захешировать пароль: %w", err)
+		return nil, WrapError(err, "не удалось захешировать пароль")
 	}
 
 	// Создаем пользователя
@@ -50,16 +48,16 @@ func (s *Service) RegisterUser(req *RegisterRequest) (*tokens.TokenPair, error) 
 	}
 
 	if err := s.repo.CreateUser(user); err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
-			return nil, fmt.Errorf("пользователь уже существует")
+		if errors.Is(err, ErrUserAlreadyExists) {
+			return nil, ErrUserAlreadyExists
 		}
-		return nil, fmt.Errorf("не удалось создать пользователя: %w", err)
+		return nil, WrapError(err, "не удалось создать пользователя")
 	}
 
 	// Генерируем токены
 	tokenPair, err := s.tokenService.GenerateTokenPair(user.ID, user.Email)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось создать токены: %w", err)
+		return nil, WrapError(err, "не удалось создать токены")
 	}
 
 	return tokenPair, nil
@@ -68,23 +66,23 @@ func (s *Service) RegisterUser(req *RegisterRequest) (*tokens.TokenPair, error) 
 // validateRegisterRequest валидирует запрос на регистрацию
 func (s *Service) validateRegisterRequest(req *RegisterRequest) error {
 	if req == nil {
-		return errors.New("запрос обязателен")
+		return ErrRequestRequired
 	}
 
-	if strings.TrimSpace(req.Email) == "" {
-		return errors.New("email обязателен")
+	if req.Email == "" {
+		return ErrEmailRequired
 	}
 
-	if strings.TrimSpace(req.Password) == "" {
-		return errors.New("пароль обязателен")
+	if req.Password == "" {
+		return ErrPasswordRequired
 	}
 
 	if _, err := mail.ParseAddress(req.Email); err != nil {
-		return errors.New("неверный формат email")
+		return ErrInvalidEmail
 	}
 
 	if len(req.Password) < 6 {
-		return errors.New("пароль должен содержать минимум 6 символов")
+		return ErrPasswordTooShort
 	}
 
 	return nil
@@ -97,21 +95,22 @@ func (s *Service) LoginUser(req *LoginRequest) (*tokens.TokenPair, error) {
 		return nil, err
 	}
 
-	// Получаем пользователя по логину
+	// Получаем пользователя по email
 	user, err := s.repo.GetUserByEmail(req.Email)
 	if err != nil {
-		return nil, fmt.Errorf("неверная пара email/пароль")
+		// Не раскрываем, существует ли пользователь (безопасность)
+		return nil, ErrInvalidCredentials
 	}
 
 	// Проверяем пароль
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return nil, fmt.Errorf("неверная пара логин/пароль")
+		return nil, ErrInvalidCredentials
 	}
 
 	// Генерируем новые токены (старые refresh токены автоматически удалятся)
 	tokenPair, err := s.tokenService.GenerateTokenPair(user.ID, user.Email)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось создать токены: %w", err)
+		return nil, WrapError(err, "не удалось создать токены")
 	}
 
 	return tokenPair, nil
@@ -120,15 +119,15 @@ func (s *Service) LoginUser(req *LoginRequest) (*tokens.TokenPair, error) {
 // validateLoginRequest валидирует запрос на авторизацию
 func (s *Service) validateLoginRequest(req *LoginRequest) error {
 	if req == nil {
-		return errors.New("запрос обязателен")
+		return ErrRequestRequired
 	}
 
-	if strings.TrimSpace(req.Email) == "" {
-		return errors.New("email обязателен")
+	if req.Email == "" {
+		return ErrEmailRequired
 	}
 
-	if strings.TrimSpace(req.Password) == "" {
-		return errors.New("пароль обязателен")
+	if req.Password == "" {
+		return ErrPasswordRequired
 	}
 
 	return nil
@@ -137,25 +136,28 @@ func (s *Service) validateLoginRequest(req *LoginRequest) error {
 // RefreshTokens обновляет пару токенов на основе валидного refresh токена
 func (s *Service) RefreshTokens(refreshTokenString string) (*tokens.TokenPair, error) {
 	if refreshTokenString == "" {
-		return nil, fmt.Errorf("refresh токен отсутствует")
+		return nil, ErrRefreshTokenMissing
 	}
 
 	// Получаем refresh токен из БД
 	refreshToken, err := s.tokenService.GetRefreshToken(refreshTokenString)
 	if err != nil {
-		return nil, fmt.Errorf("недействительный refresh токен")
+		return nil, ErrInvalidRefreshToken
 	}
 
 	// Получаем пользователя по ID из refresh токена
 	user, err := s.repo.GetUserByID(refreshToken.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("пользователь не найден")
+		if errors.Is(err, ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, WrapError(err, "не удалось получить пользователя")
 	}
 
 	// Обновляем пару токенов
 	tokenPair, err := s.tokenService.RefreshTokenPair(refreshTokenString, user.ID, user.Email)
 	if err != nil {
-		return nil, err
+		return nil, WrapError(err, "не удалось обновить токены")
 	}
 
 	return tokenPair, nil
