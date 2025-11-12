@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goph-keeper-v2'
+const CACHE_NAME = 'goph-keeper-v1'
 
 // Ресурсы для кэширования
 const urlsToCache = ['/', '/index.html']

@@ -8,14 +8,15 @@ export const Header = observer(() => {
 	const store = useStoreLogic<TStoreLogic>(StoreContextLogic)
 
 	const { logout, logoutAll } = store.auth
+	const { isOnline } = store.networkStatus
 
 	const onLogout = () => {
-		void logout()
+		isOnline ? void logout() : undefined
 	}
 
 	const onLogoutAll = () => {
-		void logoutAll()
+		isOnline ? void logoutAll() : undefined
 	}
 
-	return <HeaderView onLogout={onLogout} onLogoutAll={onLogoutAll} />
+	return <HeaderView isOnline={isOnline} onLogout={onLogout} onLogoutAll={onLogoutAll} />
 })

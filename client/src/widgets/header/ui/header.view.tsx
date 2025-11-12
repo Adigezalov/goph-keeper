@@ -8,11 +8,12 @@ import { Button } from '@shared/uikit/button'
 import styles from './header.module.sass'
 
 type Props = {
+	isOnline: boolean
 	onLogout: () => void
 	onLogoutAll: () => void
 }
 
-export const HeaderView = ({ onLogout, onLogoutAll }: Props) => {
+export const HeaderView = ({ isOnline, onLogout, onLogoutAll }: Props) => {
 	const { t } = useTranslation()
 
 	return (
@@ -22,8 +23,14 @@ export const HeaderView = ({ onLogout, onLogoutAll }: Props) => {
 				<CryptoInfo />
 			</div>
 			<div className={styles.actions}>
-				<Button label={t('logout')} text onClick={onLogout} />
-				<Button label={t('logout_all')} text severity="secondary" onClick={onLogoutAll} />
+				<Button label={t('logout')} text onClick={onLogout} disabled={!isOnline} />
+				<Button
+					label={t('logout_all')}
+					text
+					severity="secondary"
+					onClick={onLogoutAll}
+					disabled={!isOnline}
+				/>
 			</div>
 		</div>
 	)
