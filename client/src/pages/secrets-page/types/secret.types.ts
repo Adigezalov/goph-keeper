@@ -4,8 +4,9 @@ export type TSecret = {
 	localId: string
 	id?: string
 	login: string
-	password: string // зашифрованный
-	metadata: string
+	password: string
+	metadata?: Record<string, string> // fileName, fileExtension, fileSize, app и т.д.
+	binaryData?: Uint8Array
 	version: number
 	syncStatus: TSyncStatus
 	createdAt: number
@@ -26,5 +27,6 @@ export type TSyncQueue = {
 export type TSecretForSave = {
 	login: string
 	password: string
-	metadata: string
+	metadata?: Record<string, string>
+	binaryData?: Uint8Array
 }

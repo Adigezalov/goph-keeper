@@ -1,6 +1,7 @@
 import { Control, FieldValues, Path } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
+import { FileUploadField } from '@shared/reused/file-upload-field/file-upload-field.tsx'
 import { InputPasswordField } from '@shared/reused/input-password-field'
 import { InputTextField } from '@shared/reused/input-text-field'
 import { Button } from '@shared/uikit/button'
@@ -11,13 +12,15 @@ import styles from './secrets-item.module.sass'
 type TSecretFormFields = {
 	login: string
 	password: string
-	metadata?: string
+	metadata?: Record<string, string>
+	binaryData?: File | Uint8Array
 }
 
 type Props<T extends FieldValues & TSecretFormFields> = {
 	control: Control<T>
 	onSave: () => void
 	onDelete?: () => void
+	onDownload?: () => void
 	isEditMode?: boolean
 	disabled?: boolean
 }
@@ -26,6 +29,7 @@ export const SecretsItemView = <T extends FieldValues & TSecretFormFields>({
 	control,
 	onSave,
 	onDelete,
+	onDownload,
 	isEditMode = false,
 	disabled = false,
 }: Props<T>) => {
@@ -37,7 +41,7 @@ export const SecretsItemView = <T extends FieldValues & TSecretFormFields>({
 		<div className={styles.root}>
 			<InputTextField<T>
 				control={control}
-				name={'metadata' as Path<T>}
+				name={'metadata.app' as Path<T>}
 				label={t('app')}
 				required={!isEditMode || !disabled}
 			/>
@@ -53,12 +57,24 @@ export const SecretsItemView = <T extends FieldValues & TSecretFormFields>({
 				label={t('password')}
 				required={!isEditMode || !disabled}
 			/>
+			<FileUploadField
+				control={control}
+				name={'binaryData' as Path<T>}
+				label={'Выберите файл'}
+			/>
 			<div className={styles.actions}>
 				<Button
 					onClick={onSave}
 					icon={<i className={saveButtonIcon} />}
 					disabled={disabled}
 				/>
+				{onDownload && (
+					<Button
+						severity="info"
+						icon={<i className="pi pi-download" />}
+						onClick={onDownload}
+					/>
+				)}
 				{onDelete && (
 					<Button
 						severity="danger"

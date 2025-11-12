@@ -33,7 +33,7 @@ export class SecretsPageStore {
 		try {
 			this.isCreating = true
 
-			const { login, password, metadata } = data.secret
+			const { login, password, metadata, binaryData } = data.secret
 
 			// Шифруем пароль с помощью CryptoStore
 			const encryptedPassword = await this.encryptPassword(password)
@@ -43,7 +43,8 @@ export class SecretsPageStore {
 				localId: uuidv4(),
 				login: login.trim(),
 				password: encryptedPassword,
-				metadata: metadata?.trim() || undefined,
+				metadata: metadata || {},
+				binaryData: binaryData || undefined,
 				version: 1,
 				syncStatus: 'pending',
 				createdAt: Date.now(),
@@ -84,11 +85,12 @@ export class SecretsPageStore {
 		}
 	}
 
-	async updateSecret(localId: string, data: TSecretForSave) {
+	async updateSecret(data: { localId: string; secret: TSecretForSave; cb: () => void }) {
 		try {
 			this.isUpdating = true
 
-			const { login, password, metadata } = data
+			const { localId, secret, cb } = data
+			const { login, password, metadata, binaryData } = secret
 
 			const existingSecret = await db.secrets.get(localId)
 			if (!existingSecret) return
@@ -99,7 +101,8 @@ export class SecretsPageStore {
 				...existingSecret,
 				login: login.trim(),
 				password: encryptedPassword,
-				metadata: metadata?.trim() || undefined,
+				metadata: metadata || {},
+				binaryData: binaryData || undefined,
 				version: existingSecret.version + 1,
 				syncStatus: 'pending',
 				updatedAt: Date.now(),
@@ -110,10 +113,14 @@ export class SecretsPageStore {
 			// await syncService.addToQueue('update', updatedSecret)
 
 			runInAction(() => {
-				const index = this.secrets.findIndex((s) => s.localId === localId)
-				if (index !== -1) {
-					this.secrets[index] = updatedSecret
-				}
+				this.secrets = this.secrets.map((secret) => {
+					if (secret.localId === localId) {
+						return updatedSecret
+					}
+					return secret
+				})
+
+				cb()
 			})
 
 			// if (navigator.onLine) {

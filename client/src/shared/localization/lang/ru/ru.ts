@@ -9,6 +9,7 @@ export const ru = {
 	info: 'Информация',
 	metadata: 'Дополнительные данные',
 	app: 'Приложение',
+	download_file: 'Скачать файл',
 	logout_all: 'Выйти везде',
 	register: 'Регистрация',
 	login_to_system: 'Вход в систему',
