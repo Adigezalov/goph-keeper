@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 
 import { CryptoInfo } from '@entities/crypto'
+import { NetworkStatus } from '@entities/network-status'
 
 import { Button } from '@shared/uikit/button'
 
@@ -17,6 +18,7 @@ export const HeaderView = ({ onLogout, onLogoutAll }: Props) => {
 	return (
 		<div className={styles.root}>
 			<div className={styles.information}>
+				<NetworkStatus />
 				<CryptoInfo />
 			</div>
 			<div className={styles.actions}>

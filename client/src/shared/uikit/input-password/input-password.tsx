@@ -31,6 +31,24 @@ export const InputPassword = ({
 				{...props}
 				className={classNames(styles.input, inputClassName)}
 				feedback={false}
+				toggleMask
+				pt={{
+					root: {
+						style: {
+							width: '100%',
+						},
+					},
+					input: {
+						style: {
+							width: '100%',
+						},
+					},
+					iconField: {
+						style: {
+							width: '100%',
+						},
+					},
+				}}
 			/>
 			{error && <span className={styles.error}>{error}</span>}
 		</div>

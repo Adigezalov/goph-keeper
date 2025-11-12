@@ -118,7 +118,7 @@ client-install: ## Установить зависимости клиента
 	@echo "Установка зависимостей клиента..."
 	@cd $(CLIENT_DIR) && bun install
 
-client-dev: ## Запустить клиент в режиме разработки (http://localhost:8000)
+client-dev: ## Запустить клиент в режиме разработки (http://localhost:3000)
 	@echo "Запуск клиента в режиме разработки..."
 	@cd $(CLIENT_DIR) && bun run dev
 

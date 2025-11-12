@@ -1,6 +1,9 @@
+import i18next from 'i18next'
 import { makeAutoObservable, runInAction } from 'mobx'
 
 import { TStoreLogic } from '@shared/store'
+import { showToastNotification } from '@shared/toast-notification'
+import { TOAST_SEVERITY } from '@shared/uikit/toast'
 
 import {
 	exportCryptoKey,
@@ -59,6 +62,30 @@ export class CryptoStore {
 			console.log('Ошибка экспорта ключа', e)
 
 			return null
+		}
+	}
+
+	copyCryptoKey = async (): Promise<boolean> => {
+		try {
+			const keyString = await this.getCryptoKeyString()
+
+			if (!keyString) {
+				console.error('Ошибка при копировании: ключ не найден')
+				return false
+			}
+
+			await navigator.clipboard.writeText(keyString)
+
+			showToastNotification({
+				message: i18next.t('copy_crypto_key_success'),
+				header: i18next.t('info'),
+				severity: TOAST_SEVERITY.INFO,
+			})
+
+			return true
+		} catch (err) {
+			console.error('Ошибка при копировании: ', err)
+			return false
 		}
 	}
 

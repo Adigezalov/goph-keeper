@@ -1,11 +1,11 @@
 import { TBook } from './book.types'
-import { DashboardPage } from './lazy-pages'
+import { SecretsPage } from './lazy-pages'
 
 export const bookPrivate: TBook[] = [
 	{
-		name: 'dashboard',
-		path: '/dashboard',
-		page: <DashboardPage />,
+		name: 'secrets',
+		path: '/secrets',
+		page: <SecretsPage />,
 		isRoot: true,
 		isShow: true,
 		isMenu: true,

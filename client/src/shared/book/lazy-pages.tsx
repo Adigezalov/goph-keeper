@@ -8,11 +8,11 @@ const AuthPageLazy = lazy(() =>
 	})),
 )
 
-const DashboardPageLazy = lazy(() =>
-	import('@pages/dashboard-page').then((module) => ({
-		default: module.DashboardPage,
+const SecretsPageLazy = lazy(() =>
+	import('@pages/secrets-page').then((module) => ({
+		default: module.SecretsPage,
 	})),
 )
 
 export const AuthPage = () => <LazyLoader Component={AuthPageLazy} />
-export const DashboardPage = () => <LazyLoader Component={DashboardPageLazy} />
+export const SecretsPage = () => <LazyLoader Component={SecretsPageLazy} />
