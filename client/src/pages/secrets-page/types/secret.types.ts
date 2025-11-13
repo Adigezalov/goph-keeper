@@ -2,7 +2,7 @@ import { TAction, TSyncStatus } from '@shared/db'
 
 export type TSecret = {
 	localId: string
-	id?: string
+	id?: string //id с сервера
 	login: string
 	password: string
 	metadata?: Record<string, string> // fileName, fileExtension, fileSize, app и т.д.
