@@ -14,6 +14,7 @@ import (
 	"github.com/Adigezalov/goph-keeper/internal/health"
 	"github.com/Adigezalov/goph-keeper/internal/middleware"
 	"github.com/Adigezalov/goph-keeper/internal/repositories"
+	"github.com/Adigezalov/goph-keeper/internal/secret"
 	"github.com/Adigezalov/goph-keeper/internal/tokens"
 	"github.com/Adigezalov/goph-keeper/internal/user"
 
@@ -73,7 +74,26 @@ func main() {
 		userRoutes.HandleFunc("/logout", userHandler.Logout).Methods("GET")
 		userRoutes.HandleFunc("/logout-all", authMiddleware.RequireAuth(userHandler.LogoutAll)).Methods("GET")
 
-		log.Println("Зарегистрированы пользовательские и защищенные маршруты")
+		log.Println("Зарегистрированы пользовательские маршруты")
+
+		// Секреты (защищенные маршруты)
+		secretRepo := secret.NewDatabaseRepository(dbRepo.GetDB())
+		secretService := secret.NewService(secretRepo)
+		secretHandler := secret.NewHandler(secretService)
+
+		secretRoutes := api.PathPrefix("/v1/secrets").Subrouter()
+
+		// CRUD операции (все требуют авторизацию)
+		secretRoutes.HandleFunc("", authMiddleware.RequireAuth(secretHandler.GetAll)).Methods("GET")
+		secretRoutes.HandleFunc("", authMiddleware.RequireAuth(secretHandler.Create)).Methods("POST")
+		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Get)).Methods("GET")
+		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Update)).Methods("PUT")
+		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Delete)).Methods("DELETE")
+
+		// Синхронизация (требует авторизацию)
+		secretRoutes.HandleFunc("/sync", authMiddleware.RequireAuth(secretHandler.Sync)).Methods("GET")
+
+		log.Println("Зарегистрированы маршруты для секретов")
 	}
 
 	// Настраиваем graceful shutdown
