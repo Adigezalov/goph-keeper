@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Adigezalov/goph-keeper/internal/config"
+	"github.com/Adigezalov/goph-keeper/internal/health"
 	"github.com/Adigezalov/goph-keeper/internal/middleware"
 	"github.com/Adigezalov/goph-keeper/internal/repositories"
 	"github.com/Adigezalov/goph-keeper/internal/tokens"
@@ -37,6 +38,11 @@ func main() {
 
 	// Настраиваем маршруты
 	api := router.PathPrefix("/api").Subrouter()
+
+	// Health check endpoint (публичный)
+	healthService := health.NewService()
+	healthHandler := health.NewHandler(healthService)
+	api.HandleFunc("/v1/health", healthHandler.Check).Methods("PATCH")
 
 	log.Println("Зарегистрированы публичные health check маршруты")
 

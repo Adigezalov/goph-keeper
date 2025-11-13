@@ -57,7 +57,9 @@ api.interceptors.response.use(
 		}
 
 		showToastNotification({
-			message: error.response.data ?? i18next.t('error.unexpected_error'),
+			message: !!error?.response?.data
+				? error?.response?.data
+				: i18next.t('error.unexpected_error'),
 			header: i18next.t('error.error'),
 			severity: TOAST_SEVERITY.ERROR,
 		})

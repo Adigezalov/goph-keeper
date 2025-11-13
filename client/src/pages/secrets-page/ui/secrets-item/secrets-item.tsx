@@ -19,9 +19,13 @@ type Props = {
 export const SecretsItem = observer(({ secret }: Props) => {
 	const store = useStoreLogic<TStoreLogic>(StoreContextLogic)
 
-	const { updateSecret, decryptPassword, deleteSecret } = store.secretsPage
+	const { updateSecret, decryptData, decryptBinaryData, deleteSecret } = store.secretsPage
 
+	const [decryptedLogin, setDecryptedLogin] = useState('')
 	const [decryptedPassword, setDecryptedPassword] = useState('')
+	const [decryptedBinaryData, setDecryptedBinaryData] = useState<Uint8Array | undefined>(
+		undefined,
+	)
 
 	const { control, handleSubmit, reset, watch } = useForm<TFormData>({
 		mode: 'all',
@@ -36,37 +40,47 @@ export const SecretsItem = observer(({ secret }: Props) => {
 	const formValues = watch()
 
 	useEffect(() => {
-		const loadDecryptedPassword = async () => {
+		const loadDecryptedData = async () => {
 			try {
-				const decrypted = await decryptPassword(secret.password)
-				setDecryptedPassword(decrypted)
+				// Расшифровываем все поля кроме metadata
+				const decryptedLoginValue = await decryptData(secret.login)
+				const decryptedPasswordValue = await decryptData(secret.password)
+				const decryptedBinaryDataValue = secret.binaryData
+					? await decryptBinaryData(secret.binaryData)
+					: undefined
+
+				setDecryptedLogin(decryptedLoginValue)
+				setDecryptedPassword(decryptedPasswordValue)
+				setDecryptedBinaryData(decryptedBinaryDataValue)
+
 				reset({
-					login: secret.login,
-					password: decrypted,
+					login: decryptedLoginValue,
+					password: decryptedPasswordValue,
 					metadata: secret.metadata || {},
-					binaryData: secret.binaryData,
+					binaryData: decryptedBinaryDataValue,
 				})
 			} catch (error) {
-				console.error('Ошибка расшифровки пароля:', error)
+				console.error('Ошибка расшифровки данных:', error)
 			}
 		}
 
-		void loadDecryptedPassword()
+		void loadDecryptedData()
 	}, [
 		secret.password,
 		secret.login,
 		secret.metadata,
 		secret.binaryData,
-		decryptPassword,
+		decryptData,
+		decryptBinaryData,
 		reset,
 	])
 
 	const disabledSave = (): boolean => {
-		const isLoginSame = formValues.login === secret.login
+		const isLoginSame = formValues.login === decryptedLogin
 		const isPasswordSame = formValues.password === decryptedPassword
 		const isMetadataSame =
 			JSON.stringify(formValues.metadata || {}) === JSON.stringify(secret.metadata || {})
-		const isBinaryDataSame = formValues.binaryData === secret.binaryData
+		const isBinaryDataSame = formValues.binaryData === decryptedBinaryData
 
 		return isLoginSame && isPasswordSame && isMetadataSame && isBinaryDataSame
 	}
@@ -76,9 +90,9 @@ export const SecretsItem = observer(({ secret }: Props) => {
 	}
 
 	const onDownload = () => {
-		if (!secret.binaryData) return
+		if (!decryptedBinaryData) return
 
-		const blob = new Blob([new Uint8Array(secret.binaryData)])
+		const blob = new Blob([decryptedBinaryData])
 
 		const url = URL.createObjectURL(blob)
 		const link = document.createElement('a')
@@ -135,7 +149,7 @@ export const SecretsItem = observer(({ secret }: Props) => {
 			control={control}
 			onSave={onSave}
 			onDelete={onDelete}
-			onDownload={!!secret.binaryData ? onDownload : undefined}
+			onDownload={!!decryptedBinaryData ? onDownload : undefined}
 			disabled={disabledSave()}
 			isEditMode
 		/>

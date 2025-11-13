@@ -35,16 +35,20 @@ export class SecretsPageStore {
 
 			const { login, password, metadata, binaryData } = data.secret
 
-			// Шифруем пароль с помощью CryptoStore
-			const encryptedPassword = await this.encryptPassword(password)
+			// Шифруем все поля кроме metadata
+			const encryptedLogin = await this.encryptData(login.trim())
+			const encryptedPassword = await this.encryptData(password)
+			const encryptedBinaryData = binaryData
+				? await this.encryptBinaryData(binaryData)
+				: undefined
 
 			// Создаем локально
 			const newSecret: TSecret = {
 				localId: uuidv4(),
-				login: login.trim(),
+				login: encryptedLogin,
 				password: encryptedPassword,
 				metadata: metadata || {},
-				binaryData: binaryData || undefined,
+				binaryData: encryptedBinaryData,
 				version: 1,
 				syncStatus: 'pending',
 				createdAt: Date.now(),
@@ -95,14 +99,19 @@ export class SecretsPageStore {
 			const existingSecret = await db.secrets.get(localId)
 			if (!existingSecret) return
 
-			const encryptedPassword = await this.encryptPassword(password)
+			// Шифруем все поля кроме metadata
+			const encryptedLogin = await this.encryptData(login.trim())
+			const encryptedPassword = await this.encryptData(password)
+			const encryptedBinaryData = binaryData
+				? await this.encryptBinaryData(binaryData)
+				: undefined
 
 			const updatedSecret: TSecret = {
 				...existingSecret,
-				login: login.trim(),
+				login: encryptedLogin,
 				password: encryptedPassword,
 				metadata: metadata || {},
-				binaryData: binaryData || undefined,
+				binaryData: encryptedBinaryData,
 				version: existingSecret.version + 1,
 				syncStatus: 'pending',
 				updatedAt: Date.now(),
@@ -256,8 +265,8 @@ export class SecretsPageStore {
 
 	// ========== Шифрование ==========
 
-	// Зашифровать пароль
-	private async encryptPassword(password: string): Promise<string> {
+	// Универсальный метод для шифрования строковых данных
+	private async encryptData(data: string): Promise<string> {
 		const cryptoKey = this.rootStore.cryptoKey.cryptoKey
 
 		if (!cryptoKey) {
@@ -269,7 +278,7 @@ export class SecretsPageStore {
 
 		// Шифруем
 		const encoder = new TextEncoder()
-		const data = encoder.encode(password)
+		const encodedData = encoder.encode(data)
 
 		const encrypted = await window.crypto.subtle.encrypt(
 			{
@@ -277,7 +286,7 @@ export class SecretsPageStore {
 				iv,
 			},
 			cryptoKey,
-			data,
+			encodedData,
 		)
 
 		// Объединяем IV и зашифрованные данные
@@ -289,8 +298,8 @@ export class SecretsPageStore {
 		return btoa(String.fromCharCode(...combined))
 	}
 
-	// Расшифровать пароль
-	async decryptPassword(encryptedPassword: string): Promise<string> {
+	// Универсальный метод для расшифровки строковых данных
+	async decryptData(encryptedData: string): Promise<string> {
 		const cryptoKey = this.rootStore.cryptoKey.cryptoKey
 
 		if (!cryptoKey) {
@@ -298,7 +307,7 @@ export class SecretsPageStore {
 		}
 
 		// Декодируем из base64
-		const combined = Uint8Array.from(atob(encryptedPassword), (c) => c.charCodeAt(0))
+		const combined = Uint8Array.from(atob(encryptedData), (c) => c.charCodeAt(0))
 
 		// Извлекаем IV и зашифрованные данные
 		const iv = combined.slice(0, 12)
@@ -317,6 +326,66 @@ export class SecretsPageStore {
 		// Конвертируем в строку
 		const decoder = new TextDecoder()
 		return decoder.decode(decrypted)
+	}
+
+	// Шифрование бинарных данных
+	private async encryptBinaryData(data: Uint8Array): Promise<Uint8Array> {
+		const cryptoKey = this.rootStore.cryptoKey.cryptoKey
+
+		if (!cryptoKey) {
+			throw new Error('Ключ шифрования не установлен')
+		}
+
+		// Генерируем IV
+		const iv = window.crypto.getRandomValues(new Uint8Array(12))
+
+		// Шифруем
+		const encrypted = await window.crypto.subtle.encrypt(
+			{
+				name: 'AES-GCM',
+				iv,
+			},
+			cryptoKey,
+			data,
+		)
+
+		// Объединяем IV и зашифрованные данные
+		const combined = new Uint8Array(iv.length + encrypted.byteLength)
+		combined.set(iv, 0)
+		combined.set(new Uint8Array(encrypted), iv.length)
+
+		return combined
+	}
+
+	// Расшифровка бинарных данных
+	async decryptBinaryData(encryptedData: Uint8Array): Promise<Uint8Array> {
+		const cryptoKey = this.rootStore.cryptoKey.cryptoKey
+
+		if (!cryptoKey) {
+			throw new Error('Ключ шифрования не установлен')
+		}
+
+		// Извлекаем IV и зашифрованные данные
+		const iv = encryptedData.slice(0, 12)
+		const encrypted = encryptedData.slice(12)
+
+		// Расшифровываем
+		const decrypted = await window.crypto.subtle.decrypt(
+			{
+				name: 'AES-GCM',
+				iv,
+			},
+			cryptoKey,
+			encrypted,
+		)
+
+		return new Uint8Array(decrypted)
+	}
+
+	// Устаревшие методы для обратной совместимости (используют новые универсальные методы)
+	/** @deprecated Используйте decryptData вместо этого */
+	async decryptPassword(encryptedPassword: string): Promise<string> {
+		return this.decryptData(encryptedPassword)
 	}
 
 	// ========== Инициализация и очистка ==========
