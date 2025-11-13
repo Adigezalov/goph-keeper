@@ -11,12 +11,10 @@ import { TSecret, TSecretForSave } from '../types'
 export class SecretsPageStore {
 	secrets: TSecret[] = []
 
-	// Статус синхронизации
 	syncStatus: 'idle' | 'syncing' | 'error' = 'idle'
 	lastSyncTime: Date | null = null
 	unsyncedCount = 0
 
-	// Статусы загрузки
 	isLoading = false
 	isCreating = false
 	isUpdating = false
@@ -209,7 +207,6 @@ export class SecretsPageStore {
 		}
 	}
 
-	// Получить все секреты из локальной БД
 	async loadSecrets() {
 		try {
 			this.isLoading = true
@@ -263,9 +260,6 @@ export class SecretsPageStore {
 	// 	})
 	// }
 
-	// ========== Шифрование ==========
-
-	// Универсальный метод для шифрования строковых данных
 	private async encryptData(data: string): Promise<string> {
 		const cryptoKey = this.rootStore.cryptoKey.cryptoKey
 
@@ -298,7 +292,6 @@ export class SecretsPageStore {
 		return btoa(String.fromCharCode(...combined))
 	}
 
-	// Универсальный метод для расшифровки строковых данных
 	async decryptData(encryptedData: string): Promise<string> {
 		const cryptoKey = this.rootStore.cryptoKey.cryptoKey
 
@@ -328,7 +321,6 @@ export class SecretsPageStore {
 		return decoder.decode(decrypted)
 	}
 
-	// Шифрование бинарных данных
 	private async encryptBinaryData(data: Uint8Array): Promise<Uint8Array> {
 		const cryptoKey = this.rootStore.cryptoKey.cryptoKey
 
@@ -346,7 +338,7 @@ export class SecretsPageStore {
 				iv,
 			},
 			cryptoKey,
-			data,
+			data.buffer as ArrayBuffer,
 		)
 
 		// Объединяем IV и зашифрованные данные
@@ -357,7 +349,6 @@ export class SecretsPageStore {
 		return combined
 	}
 
-	// Расшифровка бинарных данных
 	async decryptBinaryData(encryptedData: Uint8Array): Promise<Uint8Array> {
 		const cryptoKey = this.rootStore.cryptoKey.cryptoKey
 
@@ -376,19 +367,11 @@ export class SecretsPageStore {
 				iv,
 			},
 			cryptoKey,
-			encrypted,
+			encrypted.buffer as ArrayBuffer,
 		)
 
 		return new Uint8Array(decrypted)
 	}
-
-	// Устаревшие методы для обратной совместимости (используют новые универсальные методы)
-	/** @deprecated Используйте decryptData вместо этого */
-	async decryptPassword(encryptedPassword: string): Promise<string> {
-		return this.decryptData(encryptedPassword)
-	}
-
-	// ========== Инициализация и очистка ==========
 
 	async initStore() {
 		await this.loadSecrets()
