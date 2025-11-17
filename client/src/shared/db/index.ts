@@ -1,2 +1,2 @@
 export { db } from './db'
-export type { TAction, TSyncStatus } from './db.types'
+export type { TAction, TSyncStatus, TSyncMeta } from './db.types'

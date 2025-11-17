@@ -1,8 +1,10 @@
 package secret
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -23,13 +25,15 @@ type SecretService interface {
 
 // Handler обрабатывает HTTP запросы для секретов
 type Handler struct {
-	service SecretService
+	service        SecretService
+	chunkedService *ChunkedUploadService
 }
 
 // NewHandler создает новый экземпляр Handler
 func NewHandler(service SecretService) *Handler {
 	return &Handler{
-		service: service,
+		service:        service,
+		chunkedService: NewChunkedUploadService(),
 	}
 }
 
@@ -265,10 +269,11 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Конвертируем секреты в response
+	// Конвертируем секреты в response для синхронизации
+	// Для больших файлов (>1MB) не отправляем binary_data, клиент скачает чанками
 	secretResponses := make([]SecretResponse, 0, len(response.Secrets))
 	for _, secret := range response.Secrets {
-		secretResponses = append(secretResponses, secret.ToResponse())
+		secretResponses = append(secretResponses, secret.ToResponseForSync())
 	}
 
 	// Формируем ответ для синхронизации
@@ -286,4 +291,233 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(syncResponse); err != nil {
 		log.Printf("Ошибка отправки JSON ответа: %v", err)
 	}
+}
+
+// InitChunkedUpload обрабатывает POST /api/v1/secrets/chunks/init
+func (h *Handler) InitChunkedUpload(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
+	var req InitChunkedUploadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		return
+	}
+
+	// Инициализируем сессию
+	session, err := h.chunkedService.InitUpload(fmt.Sprintf("%d", userID), req.TotalChunks, req.TotalSize)
+	if err != nil {
+		log.Printf("Ошибка инициализации chunked upload: %v", err)
+		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		return
+	}
+
+	response := InitChunkedUploadResponse{
+		UploadID: session.UploadID,
+		SecretID: session.SecretID,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// UploadChunk обрабатывает POST /api/v1/secrets/:id/chunks
+func (h *Handler) UploadChunk(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	secretID := vars["id"]
+
+	var req UploadChunkRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		return
+	}
+
+	// Проверяем, что сессия принадлежит этому пользователю
+	session, err := h.chunkedService.GetSession(req.UploadID)
+	if err != nil {
+		http.Error(w, "Сессия не найдена или истекла", http.StatusNotFound)
+		return
+	}
+
+	if session.UserID != fmt.Sprintf("%d", userID) {
+		http.Error(w, "Доступ запрещен", http.StatusForbidden)
+		return
+	}
+
+	if session.SecretID != secretID {
+		http.Error(w, "Неверный ID секрета", http.StatusBadRequest)
+		return
+	}
+
+	// Загружаем чанк
+	if err := h.chunkedService.UploadChunk(req.UploadID, req.ChunkIndex, req.Data); err != nil {
+		log.Printf("Ошибка загрузки чанка: %v", err)
+		http.Error(w, "Ошибка загрузки чанка", http.StatusInternalServerError)
+		return
+	}
+
+	response := UploadChunkResponse{
+		ChunkIndex: req.ChunkIndex,
+		Received:   true,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// FinalizeChunkedUpload обрабатывает POST /api/v1/secrets/:id/chunks/finalize
+func (h *Handler) FinalizeChunkedUpload(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	secretID := vars["id"]
+
+	var req FinalizeChunkedUploadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		return
+	}
+
+	// Проверяем сессию
+	session, err := h.chunkedService.GetSession(req.UploadID)
+	if err != nil {
+		http.Error(w, "Сессия не найдена", http.StatusNotFound)
+		return
+	}
+
+	if session.UserID != fmt.Sprintf("%d", userID) {
+		http.Error(w, "Доступ запрещен", http.StatusForbidden)
+		return
+	}
+
+	if session.SecretID != secretID {
+		http.Error(w, "Неверный ID секрета", http.StatusBadRequest)
+		return
+	}
+
+	// Собираем все чанки
+	binaryData, err := h.chunkedService.GetCompleteData(req.UploadID)
+	if err != nil {
+		log.Printf("Ошибка сборки чанков: %v", err)
+		http.Error(w, "Не все чанки загружены", http.StatusBadRequest)
+		return
+	}
+
+	// Конвертируем metadata из map[string]string в map[string]interface{}
+	metadata := make(map[string]interface{})
+	for k, v := range req.Metadata {
+		metadata[k] = v
+	}
+
+	// Создаем или обновляем секрет
+	createReq := &CreateSecretRequest{
+		Login:      req.Login,
+		Password:   req.Password,
+		Metadata:   metadata,
+		BinaryData: binaryData,
+	}
+
+	var secret *Secret
+	if req.Version != nil {
+		// Обновление существующего секрета
+		updateReq := &UpdateSecretRequest{
+			Login:      req.Login,
+			Password:   req.Password,
+			Metadata:   metadata,
+			BinaryData: binaryData,
+			Version:    *req.Version,
+		}
+		secret, err = h.service.UpdateSecret(secretID, userID, updateReq)
+	} else {
+		// Создание нового секрета
+		secret, err = h.service.CreateSecret(userID, createReq)
+	}
+
+	if err != nil {
+		log.Printf("Ошибка создания/обновления секрета: %v", err)
+
+		// Проверяем на конфликт версий
+		if errors.Is(err, ErrVersionConflict) {
+			http.Error(w, "Конфликт версий", http.StatusConflict)
+			return
+		}
+
+		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		return
+	}
+
+	// Очищаем сессию
+	h.chunkedService.CleanupSession(req.UploadID)
+
+	// Возвращаем созданный секрет
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(secret.ToResponse())
+}
+
+// DownloadChunk обрабатывает GET /api/v1/secrets/:id/chunks/:chunkIndex
+func (h *Handler) DownloadChunk(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	secretID := vars["id"]
+	chunkIndex := 0
+	if _, err := fmt.Sscanf(vars["chunkIndex"], "%d", &chunkIndex); err != nil {
+		http.Error(w, "Неверный индекс чанка", http.StatusBadRequest)
+		return
+	}
+
+	// Получаем секрет
+	secret, err := h.service.GetSecret(secretID, userID)
+	if err != nil {
+		if errors.Is(err, ErrSecretNotFound) {
+			http.Error(w, "Секрет не найден", http.StatusNotFound)
+			return
+		}
+		log.Printf("Ошибка получения секрета: %v", err)
+		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		return
+	}
+
+	// Разбиваем binary data на чанки
+	const chunkSize = 100 * 1024 // 100 KB
+	chunks := SplitIntoChunks(secret.BinaryData, chunkSize)
+
+	if chunkIndex < 0 || chunkIndex >= len(chunks) {
+		http.Error(w, "Неверный индекс чанка", http.StatusBadRequest)
+		return
+	}
+
+	// Кодируем чанк в base64
+	chunkData := chunks[chunkIndex]
+	base64Data := base64.StdEncoding.EncodeToString(chunkData)
+
+	response := DownloadChunkResponse{
+		ChunkIndex:  chunkIndex,
+		Data:        base64Data,
+		TotalChunks: len(chunks),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }

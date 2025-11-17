@@ -39,18 +39,24 @@ type UpdateSecretRequest struct {
 
 // SecretResponse представляет ответ с секретом (для клиента)
 type SecretResponse struct {
-	ID         string                 `json:"id"` // UUID
-	Login      string                 `json:"login"`
-	Password   string                 `json:"password"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty"`
-	BinaryData []byte                 `json:"binary_data,omitempty"`
-	Version    int                    `json:"version"`
-	CreatedAt  time.Time              `json:"created_at"`
-	UpdatedAt  time.Time              `json:"updated_at"`
-	DeletedAt  *time.Time             `json:"deleted_at,omitempty"`
+	ID             string                 `json:"id"` // UUID
+	Login          string                 `json:"login"`
+	Password       string                 `json:"password"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	BinaryData     []byte                 `json:"binary_data,omitempty"`
+	BinaryDataSize *int64                 `json:"binary_data_size,omitempty"` // Размер binary_data (если данные не включены)
+	Version        int                    `json:"version"`
+	CreatedAt      time.Time              `json:"created_at"`
+	UpdatedAt      time.Time              `json:"updated_at"`
+	DeletedAt      *time.Time             `json:"deleted_at,omitempty"`
 }
 
-// ToResponse конвертирует Secret в SecretResponse
+const (
+	// MinSizeForChunks - минимальный размер для использования chunked transfer (1 MB)
+	MinSizeForChunks = 1 * 1024 * 1024
+)
+
+// ToResponse конвертирует Secret в SecretResponse (для создания/обновления)
 func (s *Secret) ToResponse() SecretResponse {
 	resp := SecretResponse{
 		ID:         s.ID,
@@ -65,6 +71,35 @@ func (s *Secret) ToResponse() SecretResponse {
 
 	if s.DeletedAt.Valid {
 		resp.DeletedAt = &s.DeletedAt.Time
+	}
+
+	return resp
+}
+
+// ToResponseForSync конвертирует Secret в SecretResponse для синхронизации
+// Для больших файлов (>1MB) не отправляет binary_data, а только размер
+func (s *Secret) ToResponseForSync() SecretResponse {
+	resp := SecretResponse{
+		ID:        s.ID,
+		Login:     s.Login,
+		Password:  s.Password,
+		Metadata:  s.Metadata,
+		Version:   s.Version,
+		CreatedAt: s.CreatedAt,
+		UpdatedAt: s.UpdatedAt,
+	}
+
+	if s.DeletedAt.Valid {
+		resp.DeletedAt = &s.DeletedAt.Time
+	}
+
+	// Для больших файлов отправляем только размер, клиент скачает чанками
+	if len(s.BinaryData) > MinSizeForChunks {
+		size := int64(len(s.BinaryData))
+		resp.BinaryDataSize = &size
+	} else {
+		// Для маленьких файлов отправляем данные целиком
+		resp.BinaryData = s.BinaryData
 	}
 
 	return resp

@@ -9,8 +9,12 @@ import { TOAST_SEVERITY } from '@shared/uikit/toast'
 import {
 	createSecretApi,
 	deleteSecretApi,
+	downloadChunkApi,
+	finalizeChunkedUploadApi,
+	initChunkedUploadApi,
 	syncSecretsApi,
 	updateSecretApi,
+	uploadChunkApi,
 } from '../api'
 import {
 	TCreateSecretRequest,
@@ -19,6 +23,12 @@ import {
 	TSecretResponse,
 	TUpdateSecretRequest,
 } from '../types'
+import {
+	calculateChunksCount,
+	mergeChunks,
+	shouldUseChunks,
+	splitIntoChunks,
+} from '../utils'
 
 export class SecretsPageStore {
 	secrets: TSecret[] = []
@@ -333,27 +343,63 @@ export class SecretsPageStore {
 					// Удаляем из локальной базы
 					await db.secrets.delete(secret.localId)
 				} else if (!secret.id) {
-					// Создаем новый секрет на сервере
-					const response = await createSecretApi(this.secretToCreateRequest(secret))
+				// Создаем новый секрет на сервере
+				// Проверяем, нужно ли использовать chunked upload
+				if (secret.binaryData && shouldUseChunks(secret.binaryData.length)) {
+					const serverSecret = await this.uploadWithChunks(
+						secret.binaryData,
+						secret.login,
+						secret.password,
+						secret.metadata,
+					)
 					// Обновляем локальный секрет с id и version с сервера
 					await db.secrets.put({
 						...secret,
-						id: response.data.id,
-						version: response.data.version,
+						id: serverSecret.id,
+						version: serverSecret.version,
 						syncStatus: 'synced',
 					})
 				} else {
-					// Обновляем существующий секрет на сервере
-					const response = await updateSecretApi(
-						secret.id,
-						this.secretToUpdateRequest(secret),
+						// Обычное создание для маленьких файлов
+						const response = await createSecretApi(this.secretToCreateRequest(secret))
+						// Обновляем локальный секрет с id и version с сервера
+						await db.secrets.put({
+							...secret,
+							id: response.data.id,
+							version: response.data.version,
+							syncStatus: 'synced',
+						})
+					}
+				} else {
+				// Обновляем существующий секрет на сервере
+				// Проверяем, нужно ли использовать chunked upload
+				if (secret.binaryData && shouldUseChunks(secret.binaryData.length)) {
+					const serverSecret = await this.uploadWithChunks(
+						secret.binaryData,
+						secret.login,
+						secret.password,
+						secret.metadata,
+						secret.version,
 					)
 					// Обновляем локальный секрет с новой version с сервера
 					await db.secrets.put({
 						...secret,
-						version: response.data.version,
+						version: serverSecret.version,
 						syncStatus: 'synced',
 					})
+				} else {
+						// Обычное обновление для маленьких файлов
+						const response = await updateSecretApi(
+							secret.id,
+							this.secretToUpdateRequest(secret),
+						)
+						// Обновляем локальный секрет с новой version с сервера
+						await db.secrets.put({
+							...secret,
+							version: response.data.version,
+							syncStatus: 'synced',
+						})
+					}
 				}
 			} catch (error) {
 				console.error('Ошибка отправки секрета на сервер:', error)
@@ -376,6 +422,9 @@ export class SecretsPageStore {
 			runInAction(() => {
 				this.lastSyncTime = response.data.server_time
 			})
+			
+			// Сохраняем в IndexedDB для использования после перезагрузки
+			await this.saveLastSyncTime(response.data.server_time)
 		} catch (error) {
 			console.error('Ошибка получения данных с сервера:', error)
 			throw error
@@ -386,21 +435,40 @@ export class SecretsPageStore {
 	private async applyServerSecret(serverSecret: TSecretResponse) {
 		// Ищем локальный секрет по server id
 		const existingSecret = await db.secrets
-			.filter((s) => s.id === serverSecret.id)
+			.where('id')
+			.equals(serverSecret.id)
 			.first()
-
-		// Конвертируем binary_data из base64 в Uint8Array если есть
-		const binaryData = serverSecret.binary_data
-			? this.base64ToUint8Array(serverSecret.binary_data)
-			: undefined
 
 		if (serverSecret.deleted_at) {
 			// Секрет удален на сервере
 			if (existingSecret) {
 				await db.secrets.delete(existingSecret.localId)
 			}
-		} else if (existingSecret) {
-			// Обновляем существующий секрет (без конфликтов, просто берем версию с сервера)
+			return
+		}
+
+		if (existingSecret) {
+			// Проверяем, нужно ли обновлять
+			const needsUpdate =
+				existingSecret.version !== serverSecret.version ||
+				existingSecret.syncStatus !== 'synced'
+
+			if (!needsUpdate) {
+				// Секрет уже актуален, пропускаем
+				return
+			}
+
+			// Получаем binary_data только если нужно обновление
+			let binaryData: Uint8Array | undefined = existingSecret.binaryData
+			if (serverSecret.binary_data) {
+				// Данные пришли целиком (маленький файл)
+				binaryData = this.base64ToUint8Array(serverSecret.binary_data)
+			} else if (serverSecret.binary_data_size && serverSecret.binary_data_size > 0) {
+				// Данные нужно скачать чанками (большой файл)
+				binaryData = await this.downloadWithChunks(serverSecret.id)
+			}
+
+			// Обновляем существующий секрет
 			await db.secrets.put({
 				...existingSecret,
 				login: serverSecret.login,
@@ -413,6 +481,16 @@ export class SecretsPageStore {
 			})
 		} else {
 			// Создаем новый локальный секрет
+			// Получаем binary_data
+			let binaryData: Uint8Array | undefined
+			if (serverSecret.binary_data) {
+				// Данные пришли целиком (маленький файл)
+				binaryData = this.base64ToUint8Array(serverSecret.binary_data)
+			} else if (serverSecret.binary_data_size && serverSecret.binary_data_size > 0) {
+				// Данные нужно скачать чанками (большой файл)
+				binaryData = await this.downloadWithChunks(serverSecret.id)
+			}
+
 			const newSecret: TSecret = {
 				localId: uuidv4(),
 				id: serverSecret.id,
@@ -437,6 +515,29 @@ export class SecretsPageStore {
 		runInAction(() => {
 			this.unsyncedCount = count
 		})
+	}
+
+	// Загрузка lastSyncTime из IndexedDB
+	private async loadLastSyncTime() {
+		try {
+			const meta = await db.syncMeta.get('lastSyncTime')
+			if (meta) {
+				runInAction(() => {
+					this.lastSyncTime = meta.value
+				})
+			}
+		} catch (error) {
+			console.error('Ошибка загрузки lastSyncTime:', error)
+		}
+	}
+
+	// Сохранение lastSyncTime в IndexedDB
+	private async saveLastSyncTime(time: string) {
+		try {
+			await db.syncMeta.put({ key: 'lastSyncTime', value: time })
+		} catch (error) {
+			console.error('Ошибка сохранения lastSyncTime:', error)
+		}
 	}
 
 	// Конвертация локального секрета в формат для создания на сервере
@@ -484,6 +585,84 @@ export class SecretsPageStore {
 		}
 
 		return bytes
+	}
+
+	/**
+	 * Загрузка большого файла чанками
+	 * @param data - бинарные данные
+	 * @param login - зашифрованный логин
+	 * @param password - зашифрованный пароль
+	 * @param metadata - метаданные
+	 * @param version - версия (для update)
+	 * @returns Созданный/обновленный секрет с сервера
+	 */
+	private async uploadWithChunks(
+		data: Uint8Array,
+		login: string,
+		password: string,
+		metadata?: Record<string, string>,
+		version?: number,
+	): Promise<TSecretResponse> {
+		// 1. Разбиваем на чанки
+		const chunks = splitIntoChunks(data)
+		const totalChunks = chunks.length
+
+		// 2. Инициализируем chunked upload
+		const initResponse = await initChunkedUploadApi({
+			totalChunks,
+			totalSize: data.length,
+			metadata,
+		})
+
+		const { uploadId, secretId } = initResponse.data
+
+		// 3. Загружаем чанки по одному
+		for (let i = 0; i < chunks.length; i++) {
+			const chunk = chunks[i]
+			const chunkBase64 = this.uint8ArrayToBase64(chunk)
+
+			await uploadChunkApi(secretId, {
+				uploadId,
+				chunkIndex: i,
+				totalChunks,
+				data: chunkBase64,
+			})
+		}
+
+	// 4. Завершаем upload
+	const finalizeResponse = await finalizeChunkedUploadApi(secretId, {
+		uploadId,
+		login,
+		password,
+		metadata,
+		version,
+	})
+
+	// Возвращаем секрет от сервера
+	return finalizeResponse.data
+	}
+
+	/**
+	 * Скачивание большого файла чанками
+	 * @param secretId - ID секрета
+	 * @returns бинарные данные
+	 */
+	private async downloadWithChunks(secretId: string): Promise<Uint8Array> {
+		// 1. Скачиваем первый чанк, чтобы узнать общее количество
+		const firstChunk = await downloadChunkApi(secretId, 0)
+		const { totalChunks } = firstChunk.data
+
+		const chunks: Uint8Array[] = []
+		chunks[0] = this.base64ToUint8Array(firstChunk.data.data)
+
+		// 2. Скачиваем остальные чанки
+		for (let i = 1; i < totalChunks; i++) {
+			const chunkResponse = await downloadChunkApi(secretId, i)
+			chunks[i] = this.base64ToUint8Array(chunkResponse.data.data)
+		}
+
+		// 3. Собираем чанки обратно
+		return mergeChunks(chunks)
 	}
 
 	private async encryptData(data: string): Promise<string> {
@@ -602,6 +781,9 @@ export class SecretsPageStore {
 	async initStore() {
 		await this.loadSecrets()
 		await this.updateUnsyncedCount()
+		
+		// Загружаем lastSyncTime из IndexedDB
+		await this.loadLastSyncTime()
 
 		// Попытаться синхронизировать при инициализации, если есть сеть и сервер доступен
 		if (this.canSync()) {

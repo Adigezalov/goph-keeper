@@ -100,6 +100,12 @@ func main() {
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Get)).Methods("GET")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Update)).Methods("PUT")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Delete)).Methods("DELETE")
+
+		// Chunked upload/download routes
+		secretRoutes.HandleFunc("/chunks/init", authMiddleware.RequireAuth(secretHandler.InitChunkedUpload)).Methods("POST")
+		secretRoutes.HandleFunc("/{id}/chunks", authMiddleware.RequireAuth(secretHandler.UploadChunk)).Methods("POST")
+		secretRoutes.HandleFunc("/{id}/chunks/finalize", authMiddleware.RequireAuth(secretHandler.FinalizeChunkedUpload)).Methods("POST")
+		secretRoutes.HandleFunc("/{id}/chunks/{chunkIndex}", authMiddleware.RequireAuth(secretHandler.DownloadChunk)).Methods("GET")
 	}
 
 	// Настраиваем graceful shutdown

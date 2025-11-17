@@ -7,6 +7,7 @@ export type TSecretResponse = {
 	password: string // зашифрованный base64
 	metadata?: Record<string, string> // НЕ зашифрованный
 	binary_data?: string // зашифрованный base64
+	binary_data_size?: number // размер binary_data (если данные не включены)
 	version: number
 	created_at: string // ISO timestamp
 	updated_at: string // ISO timestamp

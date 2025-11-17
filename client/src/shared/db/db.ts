@@ -1,17 +1,20 @@
 import Dexie, { Table } from 'dexie'
 
 import { TSecret, TSyncQueue } from '@pages/secrets-page/types'
+import { TSyncMeta } from './db.types'
 
 export class KeeperDB extends Dexie {
 	secrets!: Table<TSecret, string>
 	syncQueue!: Table<TSyncQueue, string>
+	syncMeta!: Table<TSyncMeta, string>
 
 	constructor() {
 		super('KeeperDB')
 
-		this.version(2).stores({
+		this.version(3).stores({
 			secrets: 'localId, id, serverId, syncStatus, updatedAt, deletedAt',
 			syncQueue: 'id, timestamp, action, secretId',
+			syncMeta: 'key',
 		})
 	}
 
@@ -19,6 +22,7 @@ export class KeeperDB extends Dexie {
 	async clearAllData() {
 		await this.secrets.clear()
 		await this.syncQueue.clear()
+		await this.syncMeta.clear()
 	}
 
 	// Метод для полного удаления и пересоздания базы данных

@@ -168,7 +168,11 @@ func (r *DatabaseRepository) GetSecretsModifiedSince(userID int, since time.Time
 		       created_at, updated_at, deleted_at
 		FROM secrets
 		WHERE user_id = $1 
-		  AND (created_at > $2 OR updated_at > $2 OR deleted_at > $2)
+		  AND (
+		      created_at >= $2 
+		      OR updated_at >= $2 
+		      OR (deleted_at IS NOT NULL AND deleted_at >= $2)
+		  )
 		ORDER BY updated_at ASC
 	`
 
