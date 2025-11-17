@@ -90,18 +90,29 @@ func (s *Service) ValidateAccessToken(tokenString string) (*Claims, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ошибка парсинга токена: %w", err)
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		if claims["type"] != "access" {
+		tokenType, ok := claims["type"].(string)
+		if !ok || tokenType != "access" {
 			return nil, fmt.Errorf("Неверный тип токена")
 		}
 
+		userID, ok := claims["user_id"].(float64)
+		if !ok {
+			return nil, fmt.Errorf("отсутствует user_id в токене")
+		}
+
+		email, ok := claims["email"].(string)
+		if !ok {
+			return nil, fmt.Errorf("отсутствует email в токене")
+		}
+
 		return &Claims{
-			UserID: int(claims["user_id"].(float64)),
-			Email:  claims["email"].(string),
-			Type:   claims["type"].(string),
+			UserID: int(userID),
+			Email:  email,
+			Type:   tokenType,
 		}, nil
 	}
 

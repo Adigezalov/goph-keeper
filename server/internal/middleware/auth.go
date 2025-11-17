@@ -34,14 +34,14 @@ func (m *AuthMiddleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		// Получаем токен из заголовка Authorization
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+			http.Error(w, "Ошибка авторизации: отсутствует заголовок Authorization", http.StatusUnauthorized)
 			return
 		}
 
 		// Проверяем формат Bearer токена
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+			http.Error(w, "Ошибка авторизации: неверный формат токена", http.StatusUnauthorized)
 			return
 		}
 
@@ -50,7 +50,7 @@ func (m *AuthMiddleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		// Валидируем токен
 		claims, err := m.tokenService.ValidateAccessToken(tokenString)
 		if err != nil {
-			http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+			http.Error(w, "Ошибка авторизации: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 

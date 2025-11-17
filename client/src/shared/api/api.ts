@@ -94,25 +94,27 @@ api.interceptors.response.use(
 
 				processQueue(null, accessToken)
 
-				return api.request({
-					...originalRequest,
-					headers: { Authorization: `Bearer ${accessToken}` },
-				})
+				originalRequest.headers['Authorization'] = `Bearer ${accessToken}`
+				return api.request(originalRequest)
 			} catch (refreshError) {
 				processQueue(refreshError, null)
 
 				removeTokens()
 				window.location.reload()
-				throw refreshError
+				return Promise.reject(refreshError)
 			} finally {
 				isRefreshing = false
 			}
 		}
 
-		if (error.response.status === StatusCodes.UNAUTHORIZED && !error.config._isRetry) {
-			removeTokens()
-			window.location.reload()
-		}
+		// Показываем уведомление об ошибке для всех остальных случаев
+		showToastNotification({
+			message: !!error?.response?.data
+				? error?.response?.data
+				: i18next.t('error.unexpected_error'),
+			header: i18next.t('error.error'),
+			severity: TOAST_SEVERITY.ERROR,
+		})
 
 		return Promise.reject(error)
 	},

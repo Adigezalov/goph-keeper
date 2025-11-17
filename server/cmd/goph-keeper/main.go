@@ -26,6 +26,9 @@ func main() {
 
 	// Загружаем конфигурацию
 	cfg := config.NewConfig()
+	log.Printf("JWT Secret длина: %d символов", len(cfg.JWTSecret))
+	log.Printf("Access Token TTL: %v", cfg.AccessTokenTTL)
+	log.Printf("Refresh Token TTL: %v", cfg.RefreshTokenTTL)
 
 	// Создаем подключение к базе данных
 	dbRepo, err := repositories.NewDatabaseRepository(cfg.DatabaseURI)
@@ -34,66 +37,69 @@ func main() {
 		dbRepo = nil // Продолжаем работу без БД
 	}
 
-	// Создаем роутер
 	router := mux.NewRouter()
 
-	// Настраиваем маршруты
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				origin = "http://localhost:3000"
+			}
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+			// Обработка preflight запросов
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	api := router.PathPrefix("/api").Subrouter()
-
-	// Health check endpoint (публичный)
-	healthService := health.NewService()
-	healthHandler := health.NewHandler(healthService)
-	api.HandleFunc("/v1/health", healthHandler.Check).Methods("PATCH")
-
-	log.Println("Зарегистрированы публичные health check маршруты")
 
 	// Контекст для управления жизненным циклом приложения
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if dbRepo != nil {
-		// Создаем репозитории
-		userRepo := user.NewDatabaseRepository(dbRepo.GetDB())
 		tokenRepo := tokens.NewDatabaseRepository(dbRepo.GetDB())
-
-		// Создаем сервисы
 		tokenService := tokens.NewService(tokenRepo, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
-		userService := user.NewService(userRepo, tokenService)
 
-		// Создаем middleware
 		authMiddleware := middleware.NewAuthMiddleware(tokenService)
 
-		// Создаем handlers
-		userHandler := user.NewHandler(userService, cfg.RefreshTokenTTL)
+		healthService := health.NewService()
+		healthHandler := health.NewHandler(healthService)
+		healthRoutes := api.PathPrefix("/").Subrouter()
 
-		// Пользовательские маршруты
+		healthRoutes.HandleFunc("/v1/health", authMiddleware.RequireAuth(healthHandler.Check)).Methods("PATCH")
+
+		userRepo := user.NewDatabaseRepository(dbRepo.GetDB())
+		userService := user.NewService(userRepo, tokenService)
+		userHandler := user.NewHandler(userService, cfg.RefreshTokenTTL)
 		userRoutes := api.PathPrefix("/v1/user").Subrouter()
+
 		userRoutes.HandleFunc("/register", userHandler.Register).Methods("POST")
 		userRoutes.HandleFunc("/login", userHandler.Login).Methods("POST")
 		userRoutes.HandleFunc("/refresh", userHandler.Refresh).Methods("GET")
 		userRoutes.HandleFunc("/logout", userHandler.Logout).Methods("GET")
 		userRoutes.HandleFunc("/logout-all", authMiddleware.RequireAuth(userHandler.LogoutAll)).Methods("GET")
 
-		log.Println("Зарегистрированы пользовательские маршруты")
-
-		// Секреты (защищенные маршруты)
 		secretRepo := secret.NewDatabaseRepository(dbRepo.GetDB())
 		secretService := secret.NewService(secretRepo)
 		secretHandler := secret.NewHandler(secretService)
-
 		secretRoutes := api.PathPrefix("/v1/secrets").Subrouter()
 
-		// CRUD операции (все требуют авторизацию)
 		secretRoutes.HandleFunc("", authMiddleware.RequireAuth(secretHandler.GetAll)).Methods("GET")
 		secretRoutes.HandleFunc("", authMiddleware.RequireAuth(secretHandler.Create)).Methods("POST")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Get)).Methods("GET")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Update)).Methods("PUT")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Delete)).Methods("DELETE")
-
-		// Синхронизация (требует авторизацию)
 		secretRoutes.HandleFunc("/sync", authMiddleware.RequireAuth(secretHandler.Sync)).Methods("GET")
-
-		log.Println("Зарегистрированы маршруты для секретов")
 	}
 
 	// Настраиваем graceful shutdown
