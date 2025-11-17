@@ -96,10 +96,10 @@ func main() {
 
 		secretRoutes.HandleFunc("", authMiddleware.RequireAuth(secretHandler.GetAll)).Methods("GET")
 		secretRoutes.HandleFunc("", authMiddleware.RequireAuth(secretHandler.Create)).Methods("POST")
+		secretRoutes.HandleFunc("/sync", authMiddleware.RequireAuth(secretHandler.Sync)).Methods("GET")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Get)).Methods("GET")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Update)).Methods("PUT")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Delete)).Methods("DELETE")
-		secretRoutes.HandleFunc("/sync", authMiddleware.RequireAuth(secretHandler.Sync)).Methods("GET")
 	}
 
 	// Настраиваем graceful shutdown
