@@ -1,1 +1,3 @@
-export const MAX_BINARY_DATA_SIZE = 5 * 1024 * 1024
+// Максимальный размер файла: 10 МБ
+// IndexedDB имеет ограничения по квоте, поэтому не стоит делать слишком большим
+export const MAX_BINARY_DATA_SIZE = 10 * 1024 * 1024

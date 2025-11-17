@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goph-keeper-v2'
+const CACHE_NAME = 'goph-keeper-v1'
 
 // Ресурсы для кэширования
 const urlsToCache = ['/', '/index.html']
@@ -58,17 +58,17 @@ self.addEventListener('fetch', (event) => {
 			// Если нет в кэше - запрашиваем из сети
 			return fetch(request).then((response) => {
 				// Кэшируем только GET запросы со статусом 200
-				if (
-					request.method === 'GET' &&
-					response.status === 200 &&
-					response.type === 'basic'
-				) {
-					const responseToCache = response.clone()
-
-					caches.open(CACHE_NAME).then((cache) => {
-						cache.put(request, responseToCache)
-					})
-				}
+				// if (
+				// 	request.method === 'GET' &&
+				// 	response.status === 200 &&
+				// 	response.type === 'basic'
+				// ) {
+				// 	const responseToCache = response.clone()
+				//
+				// 	caches.open(CACHE_NAME).then((cache) => {
+				// 		cache.put(request, responseToCache)
+				// 	})
+				// }
 
 				return response
 			})
