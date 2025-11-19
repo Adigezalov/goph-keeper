@@ -8,7 +8,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// MockRepository - мок для Repository
 type MockRepository struct {
 	GetUserByEmailFunc func(email string) (*User, error)
 	CreateUserFunc     func(user *User) error
@@ -37,7 +36,6 @@ func (m *MockRepository) GetUserByID(id int) (*User, error) {
 	return nil, ErrUserNotFound
 }
 
-// MockTokenService - мок для TokenService
 type MockTokenService struct {
 	GenerateTokenPairFunc func(userID int, email string) (*tokens.TokenPair, error)
 	GetRefreshTokenFunc   func(tokenString string) (*tokens.RefreshToken, error)
@@ -93,8 +91,6 @@ func (m *MockTokenService) LogoutAll(userID int) error {
 func (m *MockTokenService) ValidateAccessToken() (*tokens.Claims, error) {
 	return nil, nil
 }
-
-// Тесты для RegisterUser
 
 func TestService_RegisterUser_Success(t *testing.T) {
 	mockRepo := &MockRepository{}
@@ -229,8 +225,6 @@ func TestService_RegisterUser_NilRequest(t *testing.T) {
 	}
 }
 
-// Тесты для LoginUser
-
 func TestService_LoginUser_Success(t *testing.T) {
 	password := "password123"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -357,8 +351,6 @@ func TestService_LoginUser_NilRequest(t *testing.T) {
 	}
 }
 
-// Тесты для RefreshTokens
-
 func TestService_RefreshTokens_Success(t *testing.T) {
 	mockRepo := &MockRepository{
 		GetUserByIDFunc: func(id int) (*User, error) {
@@ -426,8 +418,6 @@ func TestService_RefreshTokens_UserNotFound(t *testing.T) {
 	}
 }
 
-// Тесты для Logout
-
 func TestService_Logout_Success(t *testing.T) {
 	mockRepo := &MockRepository{}
 	mockTokenService := &MockTokenService{}
@@ -456,8 +446,6 @@ func TestService_Logout_Error(t *testing.T) {
 		t.Errorf("ожидалась ошибка %v, получена: %v", expectedErr, err)
 	}
 }
-
-// Тесты для LogoutAll
 
 func TestService_LogoutAll_Success(t *testing.T) {
 	mockRepo := &MockRepository{}

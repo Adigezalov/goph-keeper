@@ -38,7 +38,6 @@ api.interceptors.request.use(
 		config.headers['Authorization'] = `Bearer ${token}`
 		config.headers['Content-Type'] = 'application/json'
 
-		// Добавляем sessionID для исключения из WebSocket рассылки
 		const sessionID = getRealtimeSessionID()
 		if (sessionID) {
 			config.headers['X-Session-ID'] = sessionID
@@ -114,7 +113,6 @@ api.interceptors.response.use(
 			}
 		}
 
-		// Показываем уведомление об ошибке для всех остальных случаев
 		showToastNotification({
 			message: !!error?.response?.data
 				? error?.response?.data

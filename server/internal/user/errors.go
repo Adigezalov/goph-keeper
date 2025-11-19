@@ -5,47 +5,34 @@ import (
 	"fmt"
 )
 
-// Определяем типизированные ошибки для пользовательского домена
 var (
-	// ErrUserAlreadyExists ошибка при попытке создать пользователя с существующим email
-	ErrUserAlreadyExists = errors.New("Пользователь уже существует")
+	ErrUserAlreadyExists = errors.New("user.already_exists")
 
-	// ErrUserNotFound ошибка когда пользователь не найден
-	ErrUserNotFound = errors.New("Пользователь не найден")
+	ErrUserNotFound = errors.New("user.not_found")
 
-	// ErrInvalidEmail ошибка при неверном формате email
-	ErrInvalidEmail = errors.New("Неверный формат email")
+	ErrInvalidEmail = errors.New("user.invalid_email")
 
-	// ErrEmailRequired ошибка когда email не указан
-	ErrEmailRequired = errors.New("Email обязателен")
+	ErrEmailRequired = errors.New("user.email_required")
 
-	// ErrPasswordRequired ошибка когда пароль не указан
-	ErrPasswordRequired = errors.New("Пароль обязателен")
+	ErrPasswordRequired = errors.New("user.password_required")
 
-	// ErrPasswordTooShort ошибка когда пароль слишком короткий
-	ErrPasswordTooShort = errors.New("Пароль должен содержать минимум 6 символов")
+	ErrPasswordTooShort = errors.New("user.password_too_short")
 
-	// ErrInvalidCredentials ошибка при неверной паре email/пароль
-	ErrInvalidCredentials = errors.New("Неверная пара email/пароль")
+	ErrInvalidCredentials = errors.New("user.invalid_credentials")
 
-	// ErrRefreshTokenMissing ошибка когда refresh токен отсутствует
-	ErrRefreshTokenMissing = errors.New("Refresh токен отсутствует")
+	ErrRefreshTokenMissing = errors.New("user.refresh_token_missing")
 
-	// ErrInvalidRefreshToken ошибка когда refresh токен недействителен
-	ErrInvalidRefreshToken = errors.New("Недействительный refresh токен")
+	ErrInvalidRefreshToken = errors.New("user.invalid_refresh_token")
 
-	// ErrRequestRequired ошибка когда запрос не указан
-	ErrRequestRequired = errors.New("Запрос обязателен")
+	ErrRequestRequired = errors.New("user.request_required")
 )
 
-// HTTPError представляет ошибку с HTTP статус кодом
 type HTTPError struct {
 	Err        error
 	StatusCode int
 	Message    string
 }
 
-// Error реализует интерфейс error
 func (e *HTTPError) Error() string {
 	if e.Message != "" {
 		return e.Message
@@ -53,12 +40,10 @@ func (e *HTTPError) Error() string {
 	return e.Err.Error()
 }
 
-// Unwrap возвращает исходную ошибку
 func (e *HTTPError) Unwrap() error {
 	return e.Err
 }
 
-// NewHTTPError создает новую HTTP ошибку
 func NewHTTPError(err error, statusCode int, message string) *HTTPError {
 	return &HTTPError{
 		Err:        err,
@@ -67,7 +52,6 @@ func NewHTTPError(err error, statusCode int, message string) *HTTPError {
 	}
 }
 
-// WrapError оборачивает ошибку с дополнительным контекстом
 func WrapError(err error, msg string) error {
 	return fmt.Errorf("%s: %w", msg, err)
 }

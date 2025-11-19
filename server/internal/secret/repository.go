@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// Repository интерфейс для работы с секретами в БД
 type Repository interface {
 	CreateSecret(secret *Secret) error
 	GetSecretByID(id string, userID int) (*Secret, error)
@@ -17,19 +16,15 @@ type Repository interface {
 	SoftDeleteSecret(id string, userID int) error
 }
 
-// DatabaseRepository реализация Repository для PostgreSQL
 type DatabaseRepository struct {
 	db *sql.DB
 }
 
-// NewDatabaseRepository создает новый экземпляр DatabaseRepository
 func NewDatabaseRepository(db *sql.DB) *DatabaseRepository {
 	return &DatabaseRepository{db: db}
 }
 
-// CreateSecret создает новый секрет в БД
 func (r *DatabaseRepository) CreateSecret(secret *Secret) error {
-	// Сериализуем metadata в JSONB
 	var metadataJSON []byte
 	var err error
 	if secret.Metadata != nil {
@@ -62,7 +57,6 @@ func (r *DatabaseRepository) CreateSecret(secret *Secret) error {
 	return nil
 }
 
-// GetSecretByID получает секрет по ID (только если принадлежит пользователю)
 func (r *DatabaseRepository) GetSecretByID(id string, userID int) (*Secret, error) {
 	var secret Secret
 	var metadataJSON []byte
@@ -94,7 +88,6 @@ func (r *DatabaseRepository) GetSecretByID(id string, userID int) (*Secret, erro
 		return nil, WrapError(err, "не удалось получить секрет")
 	}
 
-	// Десериализуем metadata
 	if metadataJSON != nil {
 		if err := json.Unmarshal(metadataJSON, &secret.Metadata); err != nil {
 			return nil, WrapError(err, "не удалось десериализовать metadata")
@@ -104,7 +97,6 @@ func (r *DatabaseRepository) GetSecretByID(id string, userID int) (*Secret, erro
 	return &secret, nil
 }
 
-// GetSecretsByUserID получает все активные секреты пользователя (без удаленных)
 func (r *DatabaseRepository) GetSecretsByUserID(userID int) ([]*Secret, error) {
 	query := `
 		SELECT id, user_id, login, password, metadata, binary_data, version,
@@ -142,7 +134,6 @@ func (r *DatabaseRepository) GetSecretsByUserID(userID int) ([]*Secret, error) {
 			return nil, WrapError(err, "не удалось прочитать секрет")
 		}
 
-		// Десериализуем metadata
 		if metadataJSON != nil {
 			if err := json.Unmarshal(metadataJSON, &secret.Metadata); err != nil {
 				return nil, WrapError(err, "не удалось десериализовать metadata")
@@ -159,9 +150,6 @@ func (r *DatabaseRepository) GetSecretsByUserID(userID int) ([]*Secret, error) {
 	return secrets, nil
 }
 
-// GetSecretsModifiedSince получает все секреты пользователя, измененные после указанного времени
-// Это ключевой метод для инкрементальной синхронизации
-// Возвращает созданные, обновленные и удаленные (deleted_at IS NOT NULL) секреты
 func (r *DatabaseRepository) GetSecretsModifiedSince(userID int, since time.Time) ([]*Secret, error) {
 	query := `
 		SELECT id, user_id, login, password, metadata, binary_data, version,
@@ -204,7 +192,6 @@ func (r *DatabaseRepository) GetSecretsModifiedSince(userID int, since time.Time
 			return nil, WrapError(err, "не удалось прочитать секрет")
 		}
 
-		// Десериализуем metadata
 		if metadataJSON != nil {
 			if err := json.Unmarshal(metadataJSON, &secret.Metadata); err != nil {
 				return nil, WrapError(err, "не удалось десериализовать metadata")
@@ -221,10 +208,7 @@ func (r *DatabaseRepository) GetSecretsModifiedSince(userID int, since time.Time
 	return secrets, nil
 }
 
-// UpdateSecret обновляет секрет в БД
-// Проверяет version для оптимистической блокировки (предотвращение конфликтов)
 func (r *DatabaseRepository) UpdateSecret(secret *Secret) error {
-	// Сериализуем metadata в JSONB
 	var metadataJSON []byte
 	var err error
 	if secret.Metadata != nil {
@@ -254,10 +238,10 @@ func (r *DatabaseRepository) UpdateSecret(secret *Secret) error {
 		secret.Password,
 		metadataJSON,
 		secret.BinaryData,
-		secret.Version+1, // Инкрементируем версию
+		secret.Version+1,
 		secret.ID,
 		secret.UserID,
-		secret.Version, // Проверяем текущую версию (оптимистическая блокировка)
+		secret.Version,
 	).Scan(&secret.UpdatedAt)
 
 	if err != nil {
@@ -267,13 +251,11 @@ func (r *DatabaseRepository) UpdateSecret(secret *Secret) error {
 		return WrapError(err, "не удалось обновить секрет")
 	}
 
-	// Обновляем версию в объекте после успешного обновления
 	secret.Version++
 
 	return nil
 }
 
-// SoftDeleteSecret выполняет мягкое удаление секрета (устанавливает deleted_at)
 func (r *DatabaseRepository) SoftDeleteSecret(id string, userID int) error {
 	query := `
 		UPDATE secrets

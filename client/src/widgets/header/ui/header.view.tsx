@@ -29,7 +29,7 @@ export const HeaderView = ({ isOnline, onLogout, onLogoutAll }: Props) => {
 				<Button
 					label={t('logout_all')}
 					text
-					severity="secondary"
+					severity={'secondary'}
 					onClick={onLogoutAll}
 					disabled={!isOnline}
 				/>

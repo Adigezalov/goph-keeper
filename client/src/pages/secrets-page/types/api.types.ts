@@ -1,39 +1,33 @@
-// Типы для API запросов/ответов с сервера
-
-// Response типы (данные с сервера - зашифрованные)
 export type TSecretResponse = {
-	id: string // UUID с сервера
-	login: string // зашифрованный base64
-	password: string // зашифрованный base64
-	metadata?: Record<string, string> // НЕ зашифрованный
-	binary_data?: string // зашифрованный base64
-	binary_data_size?: number // размер binary_data (если данные не включены)
+	id: string
+	login: string
+	password: string
+	metadata?: Record<string, string>
+	binary_data?: string
+	binary_data_size?: number
 	version: number
-	created_at: string // ISO timestamp
-	updated_at: string // ISO timestamp
-	deleted_at?: string // ISO timestamp для soft delete
+	created_at: string
+	updated_at: string
+	deleted_at?: string
 }
 
-// Request для создания секрета (отправка на сервер)
 export type TCreateSecretRequest = {
-	login: string // зашифрованный base64
-	password: string // зашифрованный base64
+	login: string
+	password: string
 	metadata?: Record<string, string>
-	binary_data?: string // зашифрованный base64
+	binary_data?: string
 }
 
-// Request для обновления секрета
 export type TUpdateSecretRequest = {
-	login: string // зашифрованный base64
-	password: string // зашифрованный base64
+	login: string
+	password: string
 	metadata?: Record<string, string>
-	binary_data?: string // зашифрованный base64
-	version: number // для оптимистической блокировки
+	binary_data?: string
+	version: number
 }
 
-// Response для синхронизации
 export type TSyncResponse = {
 	secrets: TSecretResponse[]
-	server_time: string // ISO timestamp для следующего запроса
+	server_time: string
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 )
 
-// Repository интерфейс для работы с токенами в БД
 type Repository interface {
 	SaveRefreshToken(token *RefreshToken) error
 	GetRefreshToken(token string) (*RefreshToken, error)
@@ -13,19 +12,14 @@ type Repository interface {
 	DeleteUserRefreshTokens(userID int) error
 }
 
-// DatabaseRepository реализация Repository для Postgres
 type DatabaseRepository struct {
 	db *sql.DB
 }
 
-// NewDatabaseRepository создает новый экземпляр DatabaseRepository
 func NewDatabaseRepository(db *sql.DB) *DatabaseRepository {
 	return &DatabaseRepository{db: db}
 }
 
-// SaveRefreshToken сохраняет refresh токен в БД
-// Разрешает хранение нескольких refresh токенов для одного пользователя
-// (для поддержки множественных устройств)
 func (r *DatabaseRepository) SaveRefreshToken(token *RefreshToken) error {
 	query := `
 		INSERT INTO refresh_tokens (token, user_id) 
@@ -42,7 +36,6 @@ func (r *DatabaseRepository) SaveRefreshToken(token *RefreshToken) error {
 	return nil
 }
 
-// GetRefreshToken получает refresh токен из БД
 func (r *DatabaseRepository) GetRefreshToken(tokenString string) (*RefreshToken, error) {
 	token := &RefreshToken{}
 	query := `
@@ -63,7 +56,6 @@ func (r *DatabaseRepository) GetRefreshToken(tokenString string) (*RefreshToken,
 	return token, nil
 }
 
-// DeleteRefreshToken удаляет refresh токен из БД
 func (r *DatabaseRepository) DeleteRefreshToken(tokenString string) error {
 	query := `DELETE FROM refresh_tokens WHERE token = $1`
 
@@ -84,7 +76,6 @@ func (r *DatabaseRepository) DeleteRefreshToken(tokenString string) error {
 	return nil
 }
 
-// DeleteUserRefreshTokens удаляет все refresh токены пользователя
 func (r *DatabaseRepository) DeleteUserRefreshTokens(userID int) error {
 	query := `DELETE FROM refresh_tokens WHERE user_id = $1`
 

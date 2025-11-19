@@ -1,12 +1,7 @@
-// Размер чанка: 100 KB
 export const CHUNK_SIZE = 100 * 1024
 
-// Минимальный размер для chunked upload: 1 MB
 export const MIN_SIZE_FOR_CHUNKS = 1 * 1024 * 1024
 
-/**
- * Разбивает данные на чанки заданного размера
- */
 export const splitIntoChunks = (data: Uint8Array, chunkSize: number = CHUNK_SIZE): Uint8Array[] => {
 	const chunks: Uint8Array[] = []
 	
@@ -18,9 +13,6 @@ export const splitIntoChunks = (data: Uint8Array, chunkSize: number = CHUNK_SIZE
 	return chunks
 }
 
-/**
- * Собирает чанки обратно в один массив
- */
 export const mergeChunks = (chunks: Uint8Array[]): Uint8Array => {
 	const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
 	const result = new Uint8Array(totalLength)
@@ -34,16 +26,10 @@ export const mergeChunks = (chunks: Uint8Array[]): Uint8Array => {
 	return result
 }
 
-/**
- * Вычисляет общее количество чанков
- */
 export const calculateChunksCount = (dataSize: number, chunkSize: number = CHUNK_SIZE): number => {
 	return Math.ceil(dataSize / chunkSize)
 }
 
-/**
- * Проверяет, нужно ли использовать chunked upload
- */
 export const shouldUseChunks = (dataSize: number): boolean => {
 	return dataSize > MIN_SIZE_FOR_CHUNKS
 }

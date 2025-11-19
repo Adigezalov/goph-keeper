@@ -9,7 +9,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// MockRepository - мок для Repository
 type MockRepository struct {
 	SaveRefreshTokenFunc        func(token *RefreshToken) error
 	GetRefreshTokenFunc         func(token string) (*RefreshToken, error)
@@ -54,8 +53,6 @@ func (m *MockRepository) DeleteUserRefreshTokens(userID int) error {
 	return nil
 }
 
-// Тесты для GenerateTokenPair
-
 func TestService_GenerateTokenPair_Success(t *testing.T) {
 	mockRepo := &MockRepository{}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
@@ -78,7 +75,6 @@ func TestService_GenerateTokenPair_Success(t *testing.T) {
 		t.Error("RefreshToken не должен быть пустым")
 	}
 
-	// Проверяем, что access токен валидный JWT
 	token, err := jwt.Parse(tokenPair.AccessToken, func(token *jwt.Token) (interface{}, error) {
 		return []byte("test-secret"), nil
 	})
@@ -91,7 +87,6 @@ func TestService_GenerateTokenPair_Success(t *testing.T) {
 		t.Error("access токен должен быть валидным")
 	}
 
-	// Проверяем claims
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
 		if claims["user_id"].(float64) != 1 {
 			t.Errorf("ожидался user_id=1, получен %v", claims["user_id"])
@@ -104,7 +99,6 @@ func TestService_GenerateTokenPair_Success(t *testing.T) {
 		}
 	}
 
-	// Проверяем, что refresh токен - это hex строка (64 символа для 32 байт)
 	if len(tokenPair.RefreshToken) != 64 {
 		t.Errorf("refresh токен должен быть 64 символа (hex), получен %d", len(tokenPair.RefreshToken))
 	}
@@ -130,13 +124,10 @@ func TestService_GenerateTokenPair_SaveError(t *testing.T) {
 	}
 }
 
-// Тесты для ValidateAccessToken
-
 func TestService_ValidateAccessToken_Success(t *testing.T) {
 	mockRepo := &MockRepository{}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
 
-	// Генерируем валидный токен
 	tokenPair, _ := service.GenerateTokenPair(42, "test@example.com")
 
 	claims, err := service.ValidateAccessToken(tokenPair.AccessToken)
@@ -177,7 +168,6 @@ func TestService_ValidateAccessToken_WrongSecret(t *testing.T) {
 	mockRepo := &MockRepository{}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
 
-	// Генерируем токен с другим секретом
 	claims := jwt.MapClaims{
 		"user_id": 1,
 		"email":   "test@example.com",
@@ -199,12 +189,11 @@ func TestService_ValidateAccessToken_ExpiredToken(t *testing.T) {
 	mockRepo := &MockRepository{}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
 
-	// Генерируем истекший токен
 	claims := jwt.MapClaims{
 		"user_id": 1,
 		"email":   "test@example.com",
 		"type":    "access",
-		"exp":     time.Now().Add(-1 * time.Hour).Unix(), // истек час назад
+		"exp":     time.Now().Add(-1 * time.Hour).Unix(),
 		"iat":     time.Now().Add(-2 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -221,11 +210,10 @@ func TestService_ValidateAccessToken_WrongType(t *testing.T) {
 	mockRepo := &MockRepository{}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
 
-	// Генерируем токен с неверным типом
 	claims := jwt.MapClaims{
 		"user_id": 1,
 		"email":   "test@example.com",
-		"type":    "refresh", // неверный тип
+		"type":    "refresh",
 		"exp":     time.Now().Add(10 * time.Minute).Unix(),
 		"iat":     time.Now().Unix(),
 	}
@@ -247,8 +235,6 @@ func TestService_ValidateAccessToken_WrongSigningMethod(t *testing.T) {
 	mockRepo := &MockRepository{}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
 
-	// Генерируем токен с неверным методом подписи (RS256 вместо HS256)
-	// Это приведет к ошибке при парсинге
 	claims := jwt.MapClaims{
 		"user_id": 1,
 		"email":   "test@example.com",
@@ -265,8 +251,6 @@ func TestService_ValidateAccessToken_WrongSigningMethod(t *testing.T) {
 		t.Fatal("ожидалась ошибка для токена с неверным методом подписи")
 	}
 }
-
-// Тесты для GetRefreshToken
 
 func TestService_GetRefreshToken_Success(t *testing.T) {
 	mockRepo := &MockRepository{}
@@ -306,8 +290,6 @@ func TestService_GetRefreshToken_NotFound(t *testing.T) {
 		t.Errorf("ожидалась ошибка %v, получена: %v", expectedErr, err)
 	}
 }
-
-// Тесты для RefreshTokenPair
 
 func TestService_RefreshTokenPair_Success(t *testing.T) {
 	mockRepo := &MockRepository{
@@ -369,13 +351,12 @@ func TestService_RefreshTokenPair_WrongUserID(t *testing.T) {
 			return &RefreshToken{
 				ID:     1,
 				Token:  token,
-				UserID: 1, // токен принадлежит user_id=1
+				UserID: 1,
 			}, nil
 		},
 	}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
 
-	// Пытаемся обновить токен для user_id=2
 	_, err := service.RefreshTokenPair("token", 2, "test@example.com")
 
 	if err == nil {
@@ -412,8 +393,6 @@ func TestService_RefreshTokenPair_DeleteError(t *testing.T) {
 		t.Errorf("ожидалось сообщение об ошибке удаления, получено: %v", err)
 	}
 }
-
-// Тесты для Logout
 
 func TestService_Logout_Success(t *testing.T) {
 	mockRepo := &MockRepository{}
@@ -479,8 +458,6 @@ func TestService_Logout_DeleteError(t *testing.T) {
 	}
 }
 
-// Тесты для LogoutAll
-
 func TestService_LogoutAll_Success(t *testing.T) {
 	mockRepo := &MockRepository{}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
@@ -512,13 +489,10 @@ func TestService_LogoutAll_Error(t *testing.T) {
 	}
 }
 
-// Тесты для generateRefreshToken
-
 func TestService_GenerateRefreshToken_UniqueTokens(t *testing.T) {
 	mockRepo := &MockRepository{}
 	service := NewService(mockRepo, "test-secret", 10*time.Minute, 24*time.Hour)
 
-	// Генерируем несколько токенов и проверяем, что они уникальны
 	tokens := make(map[string]bool)
 	for i := 0; i < 100; i++ {
 		token, err := service.generateRefreshToken()

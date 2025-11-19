@@ -4,7 +4,7 @@ import { TStoreLogic } from '@shared/store'
 
 import { serverStatusApi } from '../api'
 
-const CHECK_INTERVAL_MS = 30000 // 30 секунд
+const CHECK_INTERVAL_MS = 30000
 
 export class ServerStatusStore {
 	status = false
@@ -33,21 +33,16 @@ export class ServerStatusStore {
 		}
 	}
 
-	// Запускает периодическую проверку статуса сервера каждые 30 секунд
 	startStatusCheck = () => {
-		// Останавливаем предыдущий интервал, если он есть
 		this.stopStatusCheck()
 
-		// Первая проверка сразу
 		void this.checkStatus()
 
-		// Запускаем интервал
 		this.intervalId = setInterval(() => {
 			void this.checkStatus()
 		}, CHECK_INTERVAL_MS)
 	}
 
-	// Останавливает периодическую проверку статуса сервера
 	stopStatusCheck = () => {
 		if (this.intervalId) {
 			clearInterval(this.intervalId)

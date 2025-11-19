@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// MockRepository для тестирования
 type MockRepository struct {
 	secrets map[string]*Secret
 }
@@ -17,7 +16,6 @@ func NewMockRepository() *MockRepository {
 }
 
 func (m *MockRepository) CreateSecret(secret *Secret) error {
-	// Имитируем генерацию ID и timestamps
 	secret.ID = "test-uuid-" + time.Now().Format("20060102150405")
 	secret.CreatedAt = time.Now()
 	secret.UpdatedAt = time.Now()
@@ -77,8 +75,6 @@ func (m *MockRepository) SoftDeleteSecret(id string, userID int) error {
 	return nil
 }
 
-// Тесты
-
 func TestService_CreateSecret(t *testing.T) {
 	repo := NewMockRepository()
 	service := NewService(repo)
@@ -89,7 +85,7 @@ func TestService_CreateSecret(t *testing.T) {
 		Metadata: map[string]interface{}{"app": "github"},
 	}
 
-	secret, err := service.CreateSecret(1, req)
+	secret, err := service.CreateSecret(1, req, "")
 	if err != nil {
 		t.Fatalf("CreateSecret failed: %v", err)
 	}
@@ -141,7 +137,7 @@ func TestService_CreateSecret_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := service.CreateSecret(1, tt.req)
+			_, err := service.CreateSecret(1, tt.req, "")
 			if err != tt.wantErr {
 				t.Errorf("Expected error %v, got %v", tt.wantErr, err)
 			}
@@ -153,14 +149,12 @@ func TestService_GetSecretsForSync(t *testing.T) {
 	repo := NewMockRepository()
 	service := NewService(repo)
 
-	// Создаем тестовый секрет
 	req := &CreateSecretRequest{
 		Login:    "encrypted_login",
 		Password: "encrypted_password",
 	}
-	secret, _ := service.CreateSecret(1, req)
+	secret, _ := service.CreateSecret(1, req, "")
 
-	// Первая синхронизация (без since)
 	resp, err := service.GetSecretsForSync(1, nil)
 	if err != nil {
 		t.Fatalf("GetSecretsForSync failed: %v", err)
@@ -174,7 +168,6 @@ func TestService_GetSecretsForSync(t *testing.T) {
 		t.Error("Expected ServerTime to be set")
 	}
 
-	// Инкрементальная синхронизация
 	since := secret.CreatedAt.Add(-1 * time.Second)
 	resp2, err := service.GetSecretsForSync(1, &since)
 	if err != nil {
@@ -190,21 +183,19 @@ func TestService_UpdateSecret_VersionConflict(t *testing.T) {
 	repo := NewMockRepository()
 	service := NewService(repo)
 
-	// Создаем секрет
 	createReq := &CreateSecretRequest{
 		Login:    "login",
 		Password: "password",
 	}
-	secret, _ := service.CreateSecret(1, createReq)
+	secret, _ := service.CreateSecret(1, createReq, "")
 
-	// Обновляем с неправильной версией
 	updateReq := &UpdateSecretRequest{
 		Login:    "new_login",
 		Password: "new_password",
-		Version:  999, // Неправильная версия
+		Version:  999,
 	}
 
-	_, err := service.UpdateSecret(secret.ID, 1, updateReq)
+	_, err := service.UpdateSecret(secret.ID, 1, updateReq, "")
 	if err != ErrVersionConflict {
 		t.Errorf("Expected ErrVersionConflict, got %v", err)
 	}

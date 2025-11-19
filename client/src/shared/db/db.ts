@@ -1,3 +1,4 @@
+import i18next from 'i18next'
 import Dexie, { Table } from 'dexie'
 
 import { TSecret, TSyncQueue } from '@pages/secrets-page/types'
@@ -18,14 +19,12 @@ export class KeeperDB extends Dexie {
 		})
 	}
 
-	// Метод для полной очистки базы данных
 	async clearAllData() {
 		await this.secrets.clear()
 		await this.syncQueue.clear()
 		await this.syncMeta.clear()
 	}
 
-	// Метод для полного удаления и пересоздания базы данных
 	async resetDatabase() {
 		await this.delete()
 		await this.open()
@@ -34,16 +33,15 @@ export class KeeperDB extends Dexie {
 
 export const db = new KeeperDB()
 
-// Глобальная функция для очистки (доступна в консоли браузера)
 if (typeof window !== 'undefined') {
 	;(window as any).clearKeeperDB = async () => {
 		await db.clearAllData()
-		console.log('✅ База данных очищена')
+		console.log(i18next.t('db.cleared'))
 		window.location.reload()
 	}
 	;(window as any).resetKeeperDB = async () => {
 		await db.resetDatabase()
-		console.log('✅ База данных удалена и пересоздана')
+		console.log(i18next.t('db.reset'))
 		window.location.reload()
 	}
 }

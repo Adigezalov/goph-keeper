@@ -19,7 +19,6 @@ export class RealtimeStore {
 		this.loadSessionID()
 	}
 
-	// Загружает sessionID из localStorage
 	private loadSessionID() {
 		const stored = localStorage.getItem('realtime_session_id')
 		if (stored) {
@@ -27,14 +26,12 @@ export class RealtimeStore {
 		}
 	}
 
-	// Генерирует новый sessionID
 	generateSessionID() {
 		const newSessionID = uuidv4()
 		this.setSessionID(newSessionID)
 		return newSessionID
 	}
 
-	// Устанавливает sessionID
 	setSessionID(id: string) {
 		runInAction(() => {
 			this.sessionID = id
@@ -42,7 +39,6 @@ export class RealtimeStore {
 		})
 	}
 
-	// Очищает sessionID
 	clearSessionID() {
 		runInAction(() => {
 			this.sessionID = null
@@ -50,14 +46,12 @@ export class RealtimeStore {
 		})
 	}
 
-	// Устанавливает статус подключения
 	setConnectionStatus(status: RealtimeConnectionStatus) {
 		runInAction(() => {
 			this.connectionStatus = status
 		})
 	}
 
-	// Увеличивает счетчик попыток переподключения
 	incrementReconnectAttempts() {
 		runInAction(() => {
 			this.reconnectAttempts += 1
@@ -65,7 +59,6 @@ export class RealtimeStore {
 		})
 	}
 
-	// Сбрасывает счетчик попыток переподключения
 	resetReconnectAttempts() {
 		runInAction(() => {
 			this.reconnectAttempts = 0
@@ -73,7 +66,6 @@ export class RealtimeStore {
 		})
 	}
 
-	// Очищает store при выходе
 	clearRealtimeStore() {
 		this.clearSessionID()
 		this.setConnectionStatus('disconnected')

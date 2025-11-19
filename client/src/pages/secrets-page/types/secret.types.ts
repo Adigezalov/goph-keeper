@@ -2,10 +2,10 @@ import { TAction, TSyncStatus } from '@shared/db'
 
 export type TSecret = {
 	localId: string
-	id?: string //id с сервера
+	id?: string
 	login: string
 	password: string
-	metadata?: Record<string, string> // fileName, fileExtension, fileSize, app и т.д.
+	metadata?: Record<string, string>
 	binaryData?: Uint8Array
 	version: number
 	syncStatus: TSyncStatus
@@ -14,7 +14,6 @@ export type TSecret = {
 	deletedAt?: number
 }
 
-// Очередь синхронизации
 export type TSyncQueue = {
 	id: string
 	action: TAction

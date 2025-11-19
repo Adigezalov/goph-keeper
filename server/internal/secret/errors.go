@@ -5,20 +5,17 @@ import (
 	"fmt"
 )
 
-// Ошибки для работы с секретами
 var (
-	ErrSecretNotFound  = errors.New("секрет не найден")
-	ErrVersionConflict = errors.New("конфликт версий: секрет был изменен другим устройством")
+	ErrSecretNotFound  = errors.New("secret.not_found")
+	ErrVersionConflict = errors.New("secret.version_conflict")
 )
 
-// Ошибки валидации
 var (
-	ErrRequestRequired  = errors.New("запрос обязателен")
-	ErrLoginRequired    = errors.New("логин обязателен")
-	ErrPasswordRequired = errors.New("пароль обязателен")
+	ErrRequestRequired  = errors.New("secret.request_required")
+	ErrLoginRequired    = errors.New("secret.login_required")
+	ErrPasswordRequired = errors.New("secret.password_required")
 )
 
-// WrapError оборачивает ошибку с дополнительным контекстом
 func WrapError(err error, message string) error {
 	if err == nil {
 		return nil

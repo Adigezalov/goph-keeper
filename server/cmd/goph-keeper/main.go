@@ -12,6 +12,7 @@ import (
 
 	"github.com/Adigezalov/goph-keeper/internal/config"
 	"github.com/Adigezalov/goph-keeper/internal/health"
+	"github.com/Adigezalov/goph-keeper/internal/localization"
 	"github.com/Adigezalov/goph-keeper/internal/middleware"
 	"github.com/Adigezalov/goph-keeper/internal/realtime"
 	"github.com/Adigezalov/goph-keeper/internal/repositories"
@@ -25,24 +26,23 @@ import (
 func main() {
 	log.Println("Запуск приложения")
 
-	// Загружаем конфигурацию
 	cfg := config.NewConfig()
 	log.Printf("JWT Secret длина: %d символов", len(cfg.JWTSecret))
 	log.Printf("Access Token TTL: %v", cfg.AccessTokenTTL)
 	log.Printf("Refresh Token TTL: %v", cfg.RefreshTokenTTL)
 
-	// Создаем подключение к базе данных
 	dbRepo, err := repositories.NewDatabaseRepository(cfg.DatabaseURI)
 	if err != nil {
 		log.Printf("Предупреждение: Не удалось подключиться к базе данных: %v", err)
-		dbRepo = nil // Продолжаем работу без БД
+		dbRepo = nil
 	}
 
 	router := mux.NewRouter()
 
+	router.Use(localization.LanguageMiddleware)
+
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Проверяем, является ли это WebSocket upgrade запросом
 			isWebSocket := r.Header.Get("Upgrade") == "websocket"
 
 			origin := r.Header.Get("Origin")
@@ -54,14 +54,11 @@ func main() {
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Session-ID")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-			// Для WebSocket upgrade не устанавливаем заголовки после upgrade
 			if isWebSocket {
-				// Для WebSocket просто пропускаем дальше
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Обработка preflight запросов
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return
@@ -73,7 +70,6 @@ func main() {
 
 	api := router.PathPrefix("/api").Subrouter()
 
-	// Контекст для управления жизненным циклом приложения
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -87,7 +83,6 @@ func main() {
 		realtimeService := realtime.NewService(realtimeHub)
 		realtimeHandler := realtime.NewHandler(realtimeHub, tokenService)
 
-		// WebSocket endpoint для realtime уведомлений
 		api.HandleFunc("/v1/realtime", realtimeHandler.HandleWebSocket)
 
 		healthService := health.NewService()
@@ -126,17 +121,14 @@ func main() {
 		secretRoutes.HandleFunc("/{id}/chunks/{chunkIndex}", authMiddleware.RequireAuth(secretHandler.DownloadChunk)).Methods("GET")
 	}
 
-	// Настраиваем graceful shutdown
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
 		Handler: router,
 	}
 
-	// Канал для получения сигналов ОС
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Запускаем сервер в отдельной горутине
 	go func() {
 		log.Printf("Сервер запущен на %s", cfg.ServerAddress)
 		log.Printf("База данных: %s", cfg.DatabaseURI)
@@ -146,14 +138,11 @@ func main() {
 		}
 	}()
 
-	// Ждем сигнал завершения
 	<-sigChan
 	log.Println("Получен сигнал завершения, останавливаем сервер...")
 
-	// Останавливаем accrual worker
 	cancel()
 
-	// Останавливаем HTTP сервер
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 

@@ -13,7 +13,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// MockService для тестирования
 type MockService struct {
 	secrets map[string]*Secret
 }
@@ -24,7 +23,7 @@ func NewMockService() *MockService {
 	}
 }
 
-func (m *MockService) CreateSecret(userID int, req *CreateSecretRequest) (*Secret, error) {
+func (m *MockService) CreateSecret(userID int, req *CreateSecretRequest, excludeSessionID string) (*Secret, error) {
 	if req.Login == "" {
 		return nil, ErrLoginRequired
 	}
@@ -65,7 +64,7 @@ func (m *MockService) GetAllSecrets(userID int) ([]*Secret, error) {
 	return result, nil
 }
 
-func (m *MockService) UpdateSecret(id string, userID int, req *UpdateSecretRequest) (*Secret, error) {
+func (m *MockService) UpdateSecret(id string, userID int, req *UpdateSecretRequest, excludeSessionID string) (*Secret, error) {
 	if req.Login == "" {
 		return nil, ErrLoginRequired
 	}
@@ -91,7 +90,7 @@ func (m *MockService) UpdateSecret(id string, userID int, req *UpdateSecretReque
 	return secret, nil
 }
 
-func (m *MockService) DeleteSecret(id string, userID int) error {
+func (m *MockService) DeleteSecret(id string, userID int, excludeSessionID string) error {
 	secret, ok := m.secrets[id]
 	if !ok || secret.UserID != userID {
 		return ErrSecretNotFound
@@ -115,13 +114,10 @@ func (m *MockService) GetSecretsForSync(userID int, since *time.Time) (*SyncResp
 	}, nil
 }
 
-// Вспомогательная функция для добавления userID в контекст
 func addUserIDToContext(r *http.Request, userID int) *http.Request {
 	ctx := context.WithValue(r.Context(), middleware.UserIDKey, userID)
 	return r.WithContext(ctx)
 }
-
-// Тесты
 
 func TestHandler_Create(t *testing.T) {
 	service := NewMockService()
@@ -159,7 +155,7 @@ func TestHandler_Create_Validation(t *testing.T) {
 	handler := NewHandler(service)
 
 	reqBody := CreateSecretRequest{
-		Login:    "", // Пустой логин
+		Login:    "",
 		Password: "password",
 	}
 	body, _ := json.Marshal(reqBody)
@@ -179,11 +175,10 @@ func TestHandler_Get(t *testing.T) {
 	service := NewMockService()
 	handler := NewHandler(service)
 
-	// Создаем тестовый секрет
 	secret, _ := service.CreateSecret(1, &CreateSecretRequest{
 		Login:    "login",
 		Password: "password",
-	})
+	}, "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/secrets/"+secret.ID, nil)
 	req = addUserIDToContext(req, 1)
@@ -226,8 +221,7 @@ func TestHandler_GetAll(t *testing.T) {
 	service := NewMockService()
 	handler := NewHandler(service)
 
-	// Создаем секрет
-	secret, _ := service.CreateSecret(1, &CreateSecretRequest{Login: "login1", Password: "pass1"})
+	secret, _ := service.CreateSecret(1, &CreateSecretRequest{Login: "login1", Password: "pass1"}, "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/secrets", nil)
 	req = addUserIDToContext(req, 1)
@@ -244,7 +238,6 @@ func TestHandler_GetAll(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	// Проверяем, что секрет присутствует
 	found := false
 	for _, s := range response {
 		if s.ID == secret.ID {
@@ -261,13 +254,11 @@ func TestHandler_Update(t *testing.T) {
 	service := NewMockService()
 	handler := NewHandler(service)
 
-	// Создаем секрет
 	secret, _ := service.CreateSecret(1, &CreateSecretRequest{
 		Login:    "old_login",
 		Password: "old_password",
-	})
+	}, "")
 
-	// Обновляем
 	reqBody := UpdateSecretRequest{
 		Login:    "new_login",
 		Password: "new_password",
@@ -304,17 +295,15 @@ func TestHandler_Update_VersionConflict(t *testing.T) {
 	service := NewMockService()
 	handler := NewHandler(service)
 
-	// Создаем секрет
 	secret, _ := service.CreateSecret(1, &CreateSecretRequest{
 		Login:    "login",
 		Password: "password",
-	})
+	}, "")
 
-	// Обновляем с неправильной версией
 	reqBody := UpdateSecretRequest{
 		Login:    "new_login",
 		Password: "new_password",
-		Version:  999, // Неправильная версия
+		Version:  999,
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -334,11 +323,10 @@ func TestHandler_Delete(t *testing.T) {
 	service := NewMockService()
 	handler := NewHandler(service)
 
-	// Создаем секрет
 	secret, _ := service.CreateSecret(1, &CreateSecretRequest{
 		Login:    "login",
 		Password: "password",
-	})
+	}, "")
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/secrets/"+secret.ID, nil)
 	req = addUserIDToContext(req, 1)
@@ -356,8 +344,7 @@ func TestHandler_Sync(t *testing.T) {
 	service := NewMockService()
 	handler := NewHandler(service)
 
-	// Создаем секрет
-	secret, _ := service.CreateSecret(1, &CreateSecretRequest{Login: "login1", Password: "pass1"})
+	secret, _ := service.CreateSecret(1, &CreateSecretRequest{Login: "login1", Password: "pass1"}, "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/secrets/sync", nil)
 	req = addUserIDToContext(req, 1)
@@ -377,7 +364,6 @@ func TestHandler_Sync(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	// Проверяем, что секрет присутствует
 	found := false
 	for _, s := range response.Secrets {
 		if s.ID == secret.ID {
@@ -398,10 +384,8 @@ func TestHandler_Sync_WithSince(t *testing.T) {
 	service := NewMockService()
 	handler := NewHandler(service)
 
-	// Создаем секрет в прошлом
-	service.CreateSecret(1, &CreateSecretRequest{Login: "login1", Password: "pass1"})
+	service.CreateSecret(1, &CreateSecretRequest{Login: "login1", Password: "pass1"}, "")
 
-	// Запрашиваем с since из будущего (используем URL encoding)
 	futureTime := time.Now().Add(1 * time.Hour)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/secrets/sync", nil)
 	q := req.URL.Query()
@@ -424,7 +408,6 @@ func TestHandler_Sync_WithSince(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	// Не должно быть секретов, так как все созданы до since
 	if len(response.Secrets) != 0 {
 		t.Errorf("Expected 0 secrets, got %d", len(response.Secrets))
 	}

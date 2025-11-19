@@ -1,6 +1,7 @@
 import { observer } from 'mobx-react-lite'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 
 import { StoreContextLogic, TStoreLogic, useStoreLogic } from '@shared/store'
 
@@ -17,6 +18,7 @@ type Props = {
 }
 
 export const SecretsItem = observer(({ secret }: Props) => {
+	const { t } = useTranslation()
 	const store = useStoreLogic<TStoreLogic>(StoreContextLogic)
 
 	const { updateSecret, decryptData, decryptBinaryData, deleteSecret } = store.secretsPage
@@ -42,7 +44,6 @@ export const SecretsItem = observer(({ secret }: Props) => {
 	useEffect(() => {
 		const loadDecryptedData = async () => {
 			try {
-				// Расшифровываем все поля кроме metadata
 				const decryptedLoginValue = await decryptData(secret.login)
 				const decryptedPasswordValue = await decryptData(secret.password)
 				const decryptedBinaryDataValue = secret.binaryData
@@ -60,7 +61,7 @@ export const SecretsItem = observer(({ secret }: Props) => {
 					binaryData: decryptedBinaryDataValue,
 				})
 			} catch (error) {
-				console.error('Ошибка расшифровки данных:', error)
+				console.error(t('secrets.decrypt_error'), error)
 			}
 		}
 
@@ -92,7 +93,8 @@ export const SecretsItem = observer(({ secret }: Props) => {
 	const onDownload = () => {
 		if (!decryptedBinaryData) return
 
-		const blob = new Blob([decryptedBinaryData])
+		const arrayBuffer = new Uint8Array(decryptedBinaryData).buffer
+		const blob = new Blob([arrayBuffer])
 
 		const url = URL.createObjectURL(blob)
 		const link = document.createElement('a')
@@ -138,7 +140,6 @@ export const SecretsItem = observer(({ secret }: Props) => {
 				})
 			}
 		} catch (error) {
-			// Ошибка уже обработана в store
 		}
 	}
 

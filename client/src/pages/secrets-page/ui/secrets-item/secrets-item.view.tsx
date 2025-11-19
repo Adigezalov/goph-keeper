@@ -60,7 +60,7 @@ export const SecretsItemView = <T extends FieldValues & TSecretFormFields>({
 			<FileUploadField
 				control={control}
 				name={'binaryData' as Path<T>}
-				label={'Выберите файл'}
+				label={t('secrets.select_file')}
 			/>
 			<div className={styles.actions}>
 				<Button
@@ -68,20 +68,18 @@ export const SecretsItemView = <T extends FieldValues & TSecretFormFields>({
 					icon={<i className={saveButtonIcon} />}
 					disabled={disabled}
 				/>
-				{onDownload && (
-					<Button
-						severity="info"
-						icon={<i className="pi pi-download" />}
-						onClick={onDownload}
-					/>
-				)}
-				{onDelete && (
-					<Button
-						severity="danger"
-						icon={<i className={Icon.TRASH} />}
-						onClick={onDelete}
-					/>
-				)}
+				<Button
+					severity="info"
+					icon={<i className="pi pi-download" />}
+					onClick={onDownload}
+					disabled={!onDownload}
+				/>
+				<Button
+					severity="danger"
+					icon={<i className={Icon.TRASH} />}
+					onClick={onDelete}
+					disabled={!onDelete}
+				/>
 			</div>
 		</div>
 	)

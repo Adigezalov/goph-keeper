@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Константы для значений по умолчанию
 const (
 	DefaultServerAddress   = ":8080"
 	DefaultDatabaseURI     = "postgres://user:password@localhost:5432/keeper?sslmode=disable"
@@ -16,28 +15,20 @@ const (
 )
 
 type Config struct {
-	// ServerAddress адрес запуска HTTP-сервера
-	ServerAddress string
-	// DatabaseURI строка подключения к PostgreSQL
-	DatabaseURI string
-	// JWTSecret секретный ключ для подписи JWT токенов
-	JWTSecret string
-	// AccessTokenTTL время жизни access токена
-	AccessTokenTTL time.Duration
-	// RefreshTokenTTL время жизни refresh токена
+	ServerAddress   string
+	DatabaseURI     string
+	JWTSecret       string
+	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
 }
 
-// NewConfig создает и инициализирует конфигурацию из аргументов командной строки и переменных окружения
 func NewConfig() *Config {
 	cfg := &Config{}
 
-	// Устанавливаем значения по умолчанию
 	serverAddress := DefaultServerAddress
 	databaseURI := DefaultDatabaseURI
 	jwtSecret := DefaultJWTSecret
 
-	// Проверяем переменные окружения
 	if envRunAddr := os.Getenv("RUN_ADDRESS"); envRunAddr != "" {
 		serverAddress = envRunAddr
 	}
@@ -48,27 +39,21 @@ func NewConfig() *Config {
 		jwtSecret = envJWTSecret
 	}
 
-	// Регистрируем флаги командной строки
 	flag.StringVar(&cfg.ServerAddress, "a", serverAddress, "адрес и порт запуска сервиса")
 	flag.StringVar(&cfg.DatabaseURI, "d", databaseURI, "адрес подключения к базе данных")
 	flag.StringVar(&cfg.JWTSecret, "jwt-secret", jwtSecret, "секретный ключ для JWT токенов")
 
-	// Устанавливаем время жизни токенов
 	cfg.AccessTokenTTL = DefaultAccessTokenTTL
 	cfg.RefreshTokenTTL = DefaultRefreshTokenTTL
 
-	// Разбираем флаги
 	flag.Parse()
 
-	// Валидируем и нормализуем конфигурацию
 	cfg.normalize()
 
 	return cfg
 }
 
-// normalize выполняет нормализацию и валидацию параметров конфигурации
 func (c *Config) normalize() {
-	// Добавляем двоеточие к адресу сервера, если его нет
 	if c.ServerAddress[0] != ':' && len(c.ServerAddress) > 0 {
 		if c.ServerAddress[0] >= '0' && c.ServerAddress[0] <= '9' {
 			c.ServerAddress = ":" + c.ServerAddress

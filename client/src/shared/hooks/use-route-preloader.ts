@@ -23,7 +23,6 @@ export const useRoutePreloader = ({
 						await route()
 						await new Promise((resolve) => setTimeout(resolve, 100))
 					} catch {
-						// Игнорируем ошибки предзагрузки
 					}
 				}
 			}

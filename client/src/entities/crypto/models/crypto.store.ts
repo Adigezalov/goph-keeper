@@ -45,7 +45,7 @@ export class CryptoStore {
 
 			return true
 		} catch (e) {
-			console.log('Ошибка установки ключа', e)
+			console.log(i18next.t('crypto.set_key_error'), e)
 
 			return false
 		}
@@ -59,7 +59,7 @@ export class CryptoStore {
 
 			return await exportCryptoKey(this.cryptoKey)
 		} catch (e) {
-			console.log('Ошибка экспорта ключа', e)
+			console.log(i18next.t('crypto.export_key_error'), e)
 
 			return null
 		}
@@ -70,7 +70,7 @@ export class CryptoStore {
 			const keyString = await this.getCryptoKeyString()
 
 			if (!keyString) {
-				console.error('Ошибка при копировании: ключ не найден')
+				console.error(i18next.t('crypto.copy_error_not_found'))
 				return false
 			}
 
@@ -84,7 +84,7 @@ export class CryptoStore {
 
 			return true
 		} catch (err) {
-			console.error('Ошибка при копировании: ', err)
+			console.error(i18next.t('crypto.copy_error'), err)
 			return false
 		}
 	}
@@ -102,7 +102,7 @@ export class CryptoStore {
 				})
 			}
 		} catch (e) {
-			console.log('Ошибка загрузки ключа из localStorage', e)
+			console.log(i18next.t('crypto.load_key_error'), e)
 
 			removeCryptoKey()
 
@@ -115,5 +115,7 @@ export class CryptoStore {
 	clearCryptoStore = () => {
 		this.cryptoKey = undefined
 		this.visibleCryptoModal = false
+
+		removeCryptoKey()
 	}
 }

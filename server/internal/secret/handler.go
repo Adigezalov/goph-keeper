@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Adigezalov/goph-keeper/internal/localization"
 	"github.com/Adigezalov/goph-keeper/internal/middleware"
 	"github.com/gorilla/mux"
 )
 
-// SecretService интерфейс для бизнес-логики секретов
 type SecretService interface {
 	CreateSecret(userID int, req *CreateSecretRequest, excludeSessionID string) (*Secret, error)
 	GetSecret(id string, userID int) (*Secret, error)
@@ -23,13 +23,11 @@ type SecretService interface {
 	GetSecretsForSync(userID int, since *time.Time) (*SyncResponse, error)
 }
 
-// Handler обрабатывает HTTP запросы для секретов
 type Handler struct {
 	service        SecretService
 	chunkedService *ChunkedUploadService
 }
 
-// NewHandler создает новый экземпляр Handler
 func NewHandler(service SecretService) *Handler {
 	return &Handler{
 		service:        service,
@@ -37,16 +35,13 @@ func NewHandler(service SecretService) *Handler {
 	}
 }
 
-// Create обрабатывает POST /api/v1/secrets
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста (добавлен auth middleware)
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		localization.LocalizedError(w, r, http.StatusUnauthorized, "common.authorization_error", nil)
 		return
 	}
 
-	// Получаем sessionID из контекста (если есть) для исключения из WebSocket рассылки
 	var excludeSessionID string
 	if sessionID, ok := middleware.GetSessionIDFromContext(r.Context()); ok {
 		excludeSessionID = sessionID
@@ -54,29 +49,26 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var req CreateSecretRequest
 
-	// Декодируем JSON запрос
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "common.invalid_request_format", nil)
 		return
 	}
 
-	// Создаем секрет
 	secret, err := h.service.CreateSecret(userID, &req, excludeSessionID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrLoginRequired),
 			errors.Is(err, ErrPasswordRequired),
 			errors.Is(err, ErrRequestRequired):
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			localization.LocalizedError(w, r, http.StatusBadRequest, err.Error(), nil)
 			return
 		default:
 			log.Printf("Ошибка создания секрета: %v", err)
-			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+			localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 			return
 		}
 	}
 
-	// Возвращаем созданный секрет
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(secret.ToResponse()); err != nil {
@@ -84,38 +76,33 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Get обрабатывает GET /api/v1/secrets/{id}
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		localization.LocalizedError(w, r, http.StatusUnauthorized, "common.authorization_error", nil)
 		return
 	}
 
-	// Получаем ID секрета из URL
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == "" {
-		http.Error(w, "ID секрета обязателен", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "secret.id_required", nil)
 		return
 	}
 
-	// Получаем секрет
 	secret, err := h.service.GetSecret(id, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSecretNotFound):
-			http.Error(w, "Секрет не найден", http.StatusNotFound)
+			localization.LocalizedError(w, r, http.StatusNotFound, "secret.not_found", nil)
 			return
 		default:
 			log.Printf("Ошибка получения секрета: %v", err)
-			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+			localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 			return
 		}
 	}
 
-	// Возвращаем секрет
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(secret.ToResponse()); err != nil {
@@ -123,30 +110,25 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetAll обрабатывает GET /api/v1/secrets
 func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
 		return
 	}
 
-	// Получаем все секреты пользователя
 	secrets, err := h.service.GetAllSecrets(userID)
 	if err != nil {
 		log.Printf("Ошибка получения секретов: %v", err)
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 		return
 	}
 
-	// Конвертируем в response
 	response := make([]SecretResponse, 0, len(secrets))
 	for _, secret := range secrets {
 		response = append(response, secret.ToResponse())
 	}
 
-	// Возвращаем список секретов
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -154,60 +136,53 @@ func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Update обрабатывает PUT /api/v1/secrets/{id}
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
 		return
 	}
 
-	// Получаем sessionID из контекста (если есть) для исключения из WebSocket рассылки
 	var excludeSessionID string
 	if sessionID, ok := middleware.GetSessionIDFromContext(r.Context()); ok {
 		excludeSessionID = sessionID
 	}
 
-	// Получаем ID секрета из URL
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == "" {
-		http.Error(w, "ID секрета обязателен", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "secret.id_required", nil)
 		return
 	}
 
 	var req UpdateSecretRequest
 
-	// Декодируем JSON запрос
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "common.invalid_request_format", nil)
 		return
 	}
 
-	// Обновляем секрет
 	secret, err := h.service.UpdateSecret(id, userID, &req, excludeSessionID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSecretNotFound):
-			http.Error(w, "Секрет не найден", http.StatusNotFound)
+			localization.LocalizedError(w, r, http.StatusNotFound, "secret.not_found", nil)
 			return
 		case errors.Is(err, ErrVersionConflict):
-			http.Error(w, "Конфликт версий: секрет был изменен на другом устройстве", http.StatusConflict)
+			localization.LocalizedError(w, r, http.StatusConflict, "secret.version_conflict_detailed", nil)
 			return
 		case errors.Is(err, ErrLoginRequired),
 			errors.Is(err, ErrPasswordRequired),
 			errors.Is(err, ErrRequestRequired):
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			localization.LocalizedError(w, r, http.StatusBadRequest, err.Error(), nil)
 			return
 		default:
 			log.Printf("Ошибка обновления секрета: %v", err)
-			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+			localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 			return
 		}
 	}
 
-	// Возвращаем обновленный секрет
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(secret.ToResponse()); err != nil {
@@ -215,95 +190,79 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Delete обрабатывает DELETE /api/v1/secrets/{id}
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
 		return
 	}
 
-	// Получаем sessionID из контекста (если есть) для исключения из WebSocket рассылки
 	var excludeSessionID string
 	if sessionID, ok := middleware.GetSessionIDFromContext(r.Context()); ok {
 		excludeSessionID = sessionID
 	}
 
-	// Получаем ID секрета из URL
 	vars := mux.Vars(r)
 	id := vars["id"]
 	if id == "" {
-		http.Error(w, "ID секрета обязателен", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "secret.id_required", nil)
 		return
 	}
 
-	// Удаляем секрет
 	err := h.service.DeleteSecret(id, userID, excludeSessionID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSecretNotFound):
-			http.Error(w, "Секрет не найден", http.StatusNotFound)
+			localization.LocalizedError(w, r, http.StatusNotFound, "secret.not_found", nil)
 			return
 		default:
 			log.Printf("Ошибка удаления секрета: %v", err)
-			http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+			localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 			return
 		}
 	}
 
-	// Возвращаем успешный ответ без тела
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Sync обрабатывает GET /api/v1/secrets/sync?since=<timestamp>
-// Возвращает все секреты для синхронизации
 func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
 		return
 	}
 
-	// Получаем параметр since из query
 	var since *time.Time
 	sinceStr := r.URL.Query().Get("since")
 	if sinceStr != "" {
-		// Парсим timestamp в формате RFC3339
 		parsedTime, err := time.Parse(time.RFC3339, sinceStr)
 		if err != nil {
-			http.Error(w, "Неверный формат параметра since (ожидается RFC3339)", http.StatusBadRequest)
+			localization.LocalizedError(w, r, http.StatusBadRequest, "common.invalid_since_format", nil)
 			return
 		}
 		since = &parsedTime
 	}
 
-	// Получаем секреты для синхронизации
 	response, err := h.service.GetSecretsForSync(userID, since)
 	if err != nil {
 		log.Printf("Ошибка синхронизации секретов: %v", err)
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 		return
 	}
 
-	// Конвертируем секреты в response для синхронизации
-	// Для больших файлов (>1MB) не отправляем binary_data, клиент скачает чанками
 	secretResponses := make([]SecretResponse, 0, len(response.Secrets))
 	for _, secret := range response.Secrets {
 		secretResponses = append(secretResponses, secret.ToResponseForSync())
 	}
 
-	// Формируем ответ для синхронизации
 	syncResponse := struct {
 		Secrets    []SecretResponse `json:"secrets"`
-		ServerTime string           `json:"server_time"` // RFC3339 формат
+		ServerTime string           `json:"server_time"`
 	}{
 		Secrets:    secretResponses,
 		ServerTime: response.ServerTime.Format(time.RFC3339),
 	}
 
-	// Возвращаем результат синхронизации
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(syncResponse); err != nil {
@@ -311,25 +270,23 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// InitChunkedUpload обрабатывает POST /api/v1/secrets/chunks/init
 func (h *Handler) InitChunkedUpload(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		localization.LocalizedError(w, r, http.StatusUnauthorized, "common.authorization_error", nil)
 		return
 	}
 
 	var req InitChunkedUploadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "common.invalid_request_format", nil)
 		return
 	}
 
-	// Инициализируем сессию
 	session, err := h.chunkedService.InitUpload(fmt.Sprintf("%d", userID), req.TotalChunks, req.TotalSize)
 	if err != nil {
 		log.Printf("Ошибка инициализации chunked upload: %v", err)
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 		return
 	}
 
@@ -343,11 +300,10 @@ func (h *Handler) InitChunkedUpload(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// UploadChunk обрабатывает POST /api/v1/secrets/:id/chunks
 func (h *Handler) UploadChunk(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		localization.LocalizedError(w, r, http.StatusUnauthorized, "common.authorization_error", nil)
 		return
 	}
 
@@ -356,31 +312,29 @@ func (h *Handler) UploadChunk(w http.ResponseWriter, r *http.Request) {
 
 	var req UploadChunkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "common.invalid_request_format", nil)
 		return
 	}
 
-	// Проверяем, что сессия принадлежит этому пользователю
 	session, err := h.chunkedService.GetSession(req.UploadID)
 	if err != nil {
-		http.Error(w, "Сессия не найдена или истекла", http.StatusNotFound)
+		localization.LocalizedError(w, r, http.StatusNotFound, "secret.session_not_found", nil)
 		return
 	}
 
 	if session.UserID != fmt.Sprintf("%d", userID) {
-		http.Error(w, "Доступ запрещен", http.StatusForbidden)
+		localization.LocalizedError(w, r, http.StatusForbidden, "secret.access_denied", nil)
 		return
 	}
 
 	if session.SecretID != secretID {
-		http.Error(w, "Неверный ID секрета", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "secret.invalid_secret_id", nil)
 		return
 	}
 
-	// Загружаем чанк
 	if err := h.chunkedService.UploadChunk(req.UploadID, req.ChunkIndex, req.Data); err != nil {
 		log.Printf("Ошибка загрузки чанка: %v", err)
-		http.Error(w, "Ошибка загрузки чанка", http.StatusInternalServerError)
+		localization.LocalizedError(w, r, http.StatusInternalServerError, "secret.chunk_upload_error", nil)
 		return
 	}
 
@@ -394,11 +348,10 @@ func (h *Handler) UploadChunk(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// FinalizeChunkedUpload обрабатывает POST /api/v1/secrets/:id/chunks/finalize
 func (h *Handler) FinalizeChunkedUpload(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		localization.LocalizedError(w, r, http.StatusUnauthorized, "common.authorization_error", nil)
 		return
 	}
 
@@ -407,48 +360,43 @@ func (h *Handler) FinalizeChunkedUpload(w http.ResponseWriter, r *http.Request) 
 
 	var req FinalizeChunkedUploadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "common.invalid_request_format", nil)
 		return
 	}
 
-	// Проверяем сессию
 	session, err := h.chunkedService.GetSession(req.UploadID)
 	if err != nil {
-		http.Error(w, "Сессия не найдена", http.StatusNotFound)
+		localization.LocalizedError(w, r, http.StatusNotFound, "secret.session_not_found_simple", nil)
 		return
 	}
 
 	if session.UserID != fmt.Sprintf("%d", userID) {
-		http.Error(w, "Доступ запрещен", http.StatusForbidden)
+		localization.LocalizedError(w, r, http.StatusForbidden, "secret.access_denied", nil)
 		return
 	}
 
 	if session.SecretID != secretID {
-		http.Error(w, "Неверный ID секрета", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "secret.invalid_secret_id", nil)
 		return
 	}
 
-	// Собираем все чанки
 	binaryData, err := h.chunkedService.GetCompleteData(req.UploadID)
 	if err != nil {
 		log.Printf("Ошибка сборки чанков: %v", err)
-		http.Error(w, "Не все чанки загружены", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "secret.chunks_not_complete", nil)
 		return
 	}
 
-	// Конвертируем metadata из map[string]string в map[string]interface{}
 	metadata := make(map[string]interface{})
 	for k, v := range req.Metadata {
 		metadata[k] = v
 	}
 
-	// Получаем sessionID из контекста (если есть) для исключения из WebSocket рассылки
 	var excludeSessionID string
 	if sessionID, ok := middleware.GetSessionIDFromContext(r.Context()); ok {
 		excludeSessionID = sessionID
 	}
 
-	// Создаем или обновляем секрет
 	createReq := &CreateSecretRequest{
 		Login:      req.Login,
 		Password:   req.Password,
@@ -458,7 +406,6 @@ func (h *Handler) FinalizeChunkedUpload(w http.ResponseWriter, r *http.Request) 
 
 	var secret *Secret
 	if req.Version != nil {
-		// Обновление существующего секрета
 		updateReq := &UpdateSecretRequest{
 			Login:      req.Login,
 			Password:   req.Password,
@@ -468,37 +415,32 @@ func (h *Handler) FinalizeChunkedUpload(w http.ResponseWriter, r *http.Request) 
 		}
 		secret, err = h.service.UpdateSecret(secretID, userID, updateReq, excludeSessionID)
 	} else {
-		// Создание нового секрета
 		secret, err = h.service.CreateSecret(userID, createReq, excludeSessionID)
 	}
 
 	if err != nil {
 		log.Printf("Ошибка создания/обновления секрета: %v", err)
 
-		// Проверяем на конфликт версий
 		if errors.Is(err, ErrVersionConflict) {
-			http.Error(w, "Конфликт версий", http.StatusConflict)
+			localization.LocalizedError(w, r, http.StatusConflict, "secret.version_conflict", nil)
 			return
 		}
 
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 		return
 	}
 
-	// Очищаем сессию
 	h.chunkedService.CleanupSession(req.UploadID)
 
-	// Возвращаем созданный секрет
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(secret.ToResponse())
 }
 
-// DownloadChunk обрабатывает GET /api/v1/secrets/:id/chunks/:chunkIndex
 func (h *Handler) DownloadChunk(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, "Ошибка авторизации", http.StatusUnauthorized)
+		localization.LocalizedError(w, r, http.StatusUnauthorized, "common.authorization_error", nil)
 		return
 	}
 
@@ -506,32 +448,29 @@ func (h *Handler) DownloadChunk(w http.ResponseWriter, r *http.Request) {
 	secretID := vars["id"]
 	chunkIndex := 0
 	if _, err := fmt.Sscanf(vars["chunkIndex"], "%d", &chunkIndex); err != nil {
-		http.Error(w, "Неверный индекс чанка", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "secret.chunk_index_invalid", nil)
 		return
 	}
 
-	// Получаем секрет
 	secret, err := h.service.GetSecret(secretID, userID)
 	if err != nil {
 		if errors.Is(err, ErrSecretNotFound) {
-			http.Error(w, "Секрет не найден", http.StatusNotFound)
+			localization.LocalizedError(w, r, http.StatusNotFound, "secret.not_found", nil)
 			return
 		}
 		log.Printf("Ошибка получения секрета: %v", err)
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		localization.LocalizedError(w, r, http.StatusInternalServerError, "common.internal_error", nil)
 		return
 	}
 
-	// Разбиваем binary data на чанки
-	const chunkSize = 100 * 1024 // 100 KB
+	const chunkSize = 100 * 1024
 	chunks := SplitIntoChunks(secret.BinaryData, chunkSize)
 
 	if chunkIndex < 0 || chunkIndex >= len(chunks) {
-		http.Error(w, "Неверный индекс чанка", http.StatusBadRequest)
+		localization.LocalizedError(w, r, http.StatusBadRequest, "secret.chunk_index_invalid", nil)
 		return
 	}
 
-	// Кодируем чанк в base64
 	chunkData := chunks[chunkIndex]
 	base64Data := base64.StdEncoding.EncodeToString(chunkData)
 

@@ -148,5 +148,11 @@ export class AuthStore {
 		this.isRegistrationLoading = false
 		this.isCheckLoading = false
 		this.isLogoutLoading = false
+
+		this.rootStore.cryptoKey.clearCryptoStore()
+		this.rootStore.networkStatus.clearNetworkStatusStore()
+		this.rootStore.realtime.clearRealtimeStore()
+		this.rootStore.serverStatus.clearServerStatusStore()
+		this.rootStore.secretsPage.clearSecretsPageStore()
 	}
 }

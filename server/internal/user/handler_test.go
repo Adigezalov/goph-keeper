@@ -14,7 +14,6 @@ import (
 	"github.com/Adigezalov/goph-keeper/internal/tokens"
 )
 
-// MockService - мок для Service
 type MockService struct {
 	RegisterUserFunc  func(req *RegisterRequest) (*tokens.TokenPair, error)
 	LoginUserFunc     func(req *LoginRequest) (*tokens.TokenPair, error)
@@ -67,8 +66,6 @@ func (m *MockService) LogoutAll(userID int) error {
 	return nil
 }
 
-// Тесты для Register
-
 func TestHandler_Register_Success(t *testing.T) {
 	mockService := &MockService{}
 	handler := NewHandler(mockService, 5*time.Minute)
@@ -98,7 +95,6 @@ func TestHandler_Register_Success(t *testing.T) {
 		t.Error("AccessToken не должен быть пустым")
 	}
 
-	// Проверяем наличие cookie
 	cookies := w.Result().Cookies()
 	foundRefreshToken := false
 	for _, cookie := range cookies {
@@ -204,8 +200,6 @@ func TestHandler_Register_InternalError(t *testing.T) {
 	}
 }
 
-// Тесты для Login
-
 func TestHandler_Login_Success(t *testing.T) {
 	mockService := &MockService{}
 	handler := NewHandler(mockService, 5*time.Minute)
@@ -300,8 +294,6 @@ func TestHandler_Login_EmailRequired(t *testing.T) {
 		t.Errorf("ожидался статус 400, получен %d", w.Code)
 	}
 }
-
-// Тесты для Refresh
 
 func TestHandler_Refresh_Success(t *testing.T) {
 	mockService := &MockService{}
@@ -428,8 +420,6 @@ func TestHandler_Refresh_InternalError(t *testing.T) {
 	}
 }
 
-// Тесты для Logout
-
 func TestHandler_Logout_Success(t *testing.T) {
 	mockService := &MockService{}
 	handler := NewHandler(mockService, 5*time.Minute)
@@ -447,7 +437,6 @@ func TestHandler_Logout_Success(t *testing.T) {
 		t.Errorf("ожидался статус 200, получен %d", w.Code)
 	}
 
-	// Проверяем, что cookie удален
 	cookies := w.Result().Cookies()
 	for _, cookie := range cookies {
 		if cookie.Name == "refresh_token" {
@@ -507,20 +496,16 @@ func TestHandler_Logout_ServiceError(t *testing.T) {
 
 	handler.Logout(w, req)
 
-	// Даже если сервис вернул ошибку, logout считается успешным
 	if w.Code != http.StatusOK {
 		t.Errorf("ожидался статус 200, получен %d", w.Code)
 	}
 }
-
-// Тесты для LogoutAll
 
 func TestHandler_LogoutAll_Success(t *testing.T) {
 	mockService := &MockService{}
 	handler := NewHandler(mockService, 5*time.Minute)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/user/logout-all", nil)
-	// Добавляем userID в контекст (имитация работы middleware)
 	ctx := context.WithValue(req.Context(), middleware.UserIDKey, 1)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()

@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// MockHealthService для тестирования
 type MockHealthService struct {
 	isHealthy bool
 }
@@ -17,17 +16,14 @@ func (m *MockHealthService) CheckHealth() bool {
 }
 
 func TestHandler_Check_Healthy(t *testing.T) {
-	// Arrange
 	mockService := &MockHealthService{isHealthy: true}
 	handler := NewHandler(mockService)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	w := httptest.NewRecorder()
 
-	// Act
 	handler.Check(w, req)
 
-	// Assert
 	if w.Code != http.StatusOK {
 		t.Errorf("ожидали статус %d, получили %d", http.StatusOK, w.Code)
 	}
@@ -48,17 +44,14 @@ func TestHandler_Check_Healthy(t *testing.T) {
 }
 
 func TestHandler_Check_Unhealthy(t *testing.T) {
-	// Arrange
 	mockService := &MockHealthService{isHealthy: false}
 	handler := NewHandler(mockService)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	w := httptest.NewRecorder()
 
-	// Act
 	handler.Check(w, req)
 
-	// Assert
 	if w.Code != http.StatusServiceUnavailable {
 		t.Errorf("ожидали статус %d, получили %d", http.StatusServiceUnavailable, w.Code)
 	}

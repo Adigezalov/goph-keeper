@@ -1,4 +1,3 @@
-/// <reference types='vitest' />
 import react from '@vitejs/plugin-react'
 import * as path from 'path'
 import { defineConfig } from 'vite'
@@ -12,15 +11,15 @@ export default defineConfig({
 				target: 'http://localhost:8080',
 				changeOrigin: true,
 				secure: false,
-				ws: true, // Включаем поддержку WebSocket
+				ws: true,
 				configure: (proxy, _options) => {
 					proxy.on('error', (err, _req, _res) => {
 						console.log('proxy error', err)
 					})
-					proxy.on('proxyReqWs', (proxyReq, req, socket) => {
+					proxy.on('proxyReqWs', (_proxyReq, req, _socket) => {
 						console.log('WebSocket proxy request:', req.url)
 					})
-					proxy.on('proxyReq', (proxyReq, req, res) => {
+					proxy.on('proxyReq', (_proxyReq, req, _res) => {
 						console.log('HTTP proxy request:', req.method, req.url)
 					})
 				},
@@ -43,7 +42,7 @@ export default defineConfig({
 		outDir: './dist',
 		emptyOutDir: true,
 		reportCompressedSize: true,
-		chunkSizeWarningLimit: 1000, // Увеличиваем лимит до 1MB
+		chunkSizeWarningLimit: 1000,
 		commonjsOptions: {
 			transformMixedEsModules: true,
 		},

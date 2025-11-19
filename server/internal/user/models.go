@@ -4,7 +4,6 @@ import (
 	"time"
 )
 
-// User представляет пользователя системы
 type User struct {
 	ID           int       `json:"id" db:"id"`
 	Email        string    `json:"email" db:"email"`
@@ -13,13 +12,11 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// RegisterRequest представляет запрос на регистрацию
 type RegisterRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// LoginRequest представляет запрос на аутентификацию
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`

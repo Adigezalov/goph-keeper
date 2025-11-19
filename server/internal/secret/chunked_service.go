@@ -9,25 +9,21 @@ import (
 	"github.com/google/uuid"
 )
 
-// ChunkedUploadService управляет сессиями chunked upload
 type ChunkedUploadService struct {
 	sessions map[string]*ChunkedUploadSession
 	mu       sync.RWMutex
 }
 
-// NewChunkedUploadService создает новый сервис
 func NewChunkedUploadService() *ChunkedUploadService {
 	service := &ChunkedUploadService{
 		sessions: make(map[string]*ChunkedUploadSession),
 	}
 
-	// Запускаем очистку просроченных сессий каждые 5 минут
 	go service.cleanupExpiredSessions()
 
 	return service
 }
 
-// InitUpload инициализирует новую сессию загрузки
 func (s *ChunkedUploadService) InitUpload(userID string, totalChunks int, totalSize int64) (*ChunkedUploadSession, error) {
 	uploadID := uuid.New().String()
 	secretID := uuid.New().String()
@@ -42,7 +38,7 @@ func (s *ChunkedUploadService) InitUpload(userID string, totalChunks int, totalS
 		TotalSize:   totalSize,
 		Chunks:      make([][]byte, totalChunks),
 		CreatedAt:   time.Now(),
-		ExpiresAt:   time.Now().Add(30 * time.Minute), // Сессия живет 30 минут
+		ExpiresAt:   time.Now().Add(30 * time.Minute),
 	}
 
 	s.mu.Lock()
@@ -52,7 +48,6 @@ func (s *ChunkedUploadService) InitUpload(userID string, totalChunks int, totalS
 	return session, nil
 }
 
-// UploadChunk загружает один чанк
 func (s *ChunkedUploadService) UploadChunk(uploadID string, chunkIndex int, data string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -66,7 +61,6 @@ func (s *ChunkedUploadService) UploadChunk(uploadID string, chunkIndex int, data
 		return fmt.Errorf("invalid chunk index: %d (totalChunks: %d)", chunkIndex, session.TotalChunks)
 	}
 
-	// Декодируем base64
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return fmt.Errorf("failed to decode chunk data: %w", err)
@@ -76,7 +70,6 @@ func (s *ChunkedUploadService) UploadChunk(uploadID string, chunkIndex int, data
 	return nil
 }
 
-// GetCompleteData собирает все чанки и возвращает полные данные
 func (s *ChunkedUploadService) GetCompleteData(uploadID string) ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -86,14 +79,12 @@ func (s *ChunkedUploadService) GetCompleteData(uploadID string) ([]byte, error) 
 		return nil, fmt.Errorf("upload session not found")
 	}
 
-	// Проверяем, что все чанки загружены
 	for i, chunk := range session.Chunks {
 		if chunk == nil {
 			return nil, fmt.Errorf("chunk %d is missing", i)
 		}
 	}
 
-	// Собираем все чанки в один массив
 	totalSize := 0
 	for _, chunk := range session.Chunks {
 		totalSize += len(chunk)
@@ -107,14 +98,12 @@ func (s *ChunkedUploadService) GetCompleteData(uploadID string) ([]byte, error) 
 	return result, nil
 }
 
-// CleanupSession удаляет сессию после завершения
 func (s *ChunkedUploadService) CleanupSession(uploadID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.sessions, uploadID)
 }
 
-// GetSession возвращает сессию по ID
 func (s *ChunkedUploadService) GetSession(uploadID string) (*ChunkedUploadSession, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -127,7 +116,6 @@ func (s *ChunkedUploadService) GetSession(uploadID string) (*ChunkedUploadSessio
 	return session, nil
 }
 
-// cleanupExpiredSessions удаляет просроченные сессии
 func (s *ChunkedUploadService) cleanupExpiredSessions() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
@@ -144,7 +132,6 @@ func (s *ChunkedUploadService) cleanupExpiredSessions() {
 	}
 }
 
-// SplitIntoChunks разбивает данные на чанки для отправки клиенту
 func SplitIntoChunks(data []byte, chunkSize int) [][]byte {
 	var chunks [][]byte
 

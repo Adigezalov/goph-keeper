@@ -1,3 +1,5 @@
+import i18next from 'i18next'
+
 function isClass(func: any) {
 	return (
 		typeof func === 'function' &&
@@ -30,9 +32,7 @@ export class StoreLogicBase {
 				addValue(value)
 			}
 		} else {
-			throw new Error(
-				'Второй параметр в logic.add() должен быть объектом или массивом объектов',
-			)
+			throw new Error(i18next.t('store.logic_add_error'))
 		}
 
 		return this

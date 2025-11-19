@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// SetRefreshTokenCookie устанавливает refresh token в HTTP cookie
 func SetRefreshTokenCookie(w http.ResponseWriter, refreshToken string, refreshTokenTTL time.Duration) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -13,18 +12,17 @@ func SetRefreshTokenCookie(w http.ResponseWriter, refreshToken string, refreshTo
 		Path:     "/",
 		MaxAge:   int(refreshTokenTTL.Seconds()),
 		HttpOnly: true,
-		Secure:   false, // Установите true при использовании HTTPS
+		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
-// DeleteRefreshTokenCookie удаляет refresh token cookie
 func DeleteRefreshTokenCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
 		Path:     "/",
-		MaxAge:   -1, // Удаляет cookie
+		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   false,
 		SameSite: http.SameSiteLaxMode,

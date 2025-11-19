@@ -42,7 +42,6 @@ export const FileUploadField = <
 		<FormField control={control} name={name} rules={defaultRules}>
 			{({ value, onChange }) => {
 				useEffect(() => {
-					// Очищаем FileUpload если значение НЕ File (например, Uint8Array или undefined)
 					if (!(value instanceof File) && fileUploadRef.current) {
 						fileUploadRef.current.clear()
 					}

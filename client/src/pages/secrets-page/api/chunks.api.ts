@@ -4,7 +4,6 @@ import { IResponse } from '@shared/types'
 import { SECRETS_URL } from '../constants/api.constants'
 import { TSecretResponse } from '../types'
 
-// Типы для chunked upload
 export type TInitChunkedUploadRequest = {
 	totalChunks: number
 	totalSize: number
@@ -20,29 +19,23 @@ export type TUploadChunkRequest = {
 	uploadId: string
 	chunkIndex: number
 	totalChunks: number
-	data: string // base64
+	data: string
 }
 
 export type TFinalizeChunkedUploadRequest = {
 	uploadId: string
-	login: string // зашифрованный
-	password: string // зашифрованный
+	login: string
+	password: string
 	metadata?: Record<string, string>
-	version?: number // для update
+	version?: number
 }
 
-/**
- * Инициализация chunked upload
- */
 export const initChunkedUploadApi = (
 	data: TInitChunkedUploadRequest,
 ): Promise<IResponse<TInitChunkedUploadResponse>> => {
 	return api.post(`${SECRETS_URL.BASE}/chunks/init`, data)
 }
 
-/**
- * Загрузка одного чанка
- */
 export const uploadChunkApi = (
 	secretId: string,
 	data: TUploadChunkRequest,
@@ -50,9 +43,6 @@ export const uploadChunkApi = (
 	return api.post(`${SECRETS_URL.BASE}/${secretId}/chunks`, data)
 }
 
-/**
- * Завершение chunked upload (создание секрета)
- */
 export const finalizeChunkedUploadApi = (
 	secretId: string,
 	data: TFinalizeChunkedUploadRequest,
@@ -60,9 +50,6 @@ export const finalizeChunkedUploadApi = (
 	return api.post(`${SECRETS_URL.BASE}/${secretId}/chunks/finalize`, data)
 }
 
-/**
- * Получение чанка при скачивании
- */
 export const downloadChunkApi = (
 	secretId: string,
 	chunkIndex: number,

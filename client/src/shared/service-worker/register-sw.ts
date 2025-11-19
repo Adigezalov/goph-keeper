@@ -7,20 +7,18 @@ export const registerServiceWorker = async () => {
 	if ('serviceWorker' in navigator) {
 		try {
 			const registration = await navigator.serviceWorker.register('/service-worker.js')
-			console.log('[SW] Service Worker зарегистрирован:', registration.scope)
+			console.log(i18next.t('service_worker.registered'), registration.scope)
 
-			// Проверяем обновления каждые 60 секунд
 			setInterval(() => {
 				registration.update()
 			}, 60000)
 
-			// Обработка обновления Service Worker
 			registration.addEventListener('updatefound', () => {
 				const newWorker = registration.installing
 				if (newWorker) {
 					newWorker.addEventListener('statechange', () => {
 						if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-							console.log('[SW] Доступно обновление приложения')
+							console.log(i18next.t('service_worker.update_available'))
 
 							showToastNotification({
 								message: i18next.t('new_version_service'),
@@ -32,10 +30,10 @@ export const registerServiceWorker = async () => {
 				}
 			})
 		} catch (error) {
-			console.error('[SW] Ошибка регистрации Service Worker:', error)
+			console.error(i18next.t('service_worker.registration_error'), error)
 		}
 	} else {
-		console.warn('[SW] Service Worker не поддерживается браузером')
+		console.warn(i18next.t('service_worker.not_supported'))
 	}
 }
 
@@ -45,10 +43,10 @@ export const unregisterServiceWorker = async () => {
 			const registrations = await navigator.serviceWorker.getRegistrations()
 			for (const registration of registrations) {
 				await registration.unregister()
-				console.log('[SW] Service Worker удален')
+				console.log(i18next.t('service_worker.removed'))
 			}
 		} catch (error) {
-			console.error('[SW] Ошибка удаления Service Worker:', error)
+			console.error(i18next.t('service_worker.removal_error'), error)
 		}
 	}
 }
