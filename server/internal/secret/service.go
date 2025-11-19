@@ -2,9 +2,17 @@ package secret
 
 import "time"
 
+// RealtimeService интерфейс для отправки событий в реальном времени (опционально)
+type RealtimeService interface {
+	NotifySecretCreated(userID int, secretID string, excludeSessionID string) error
+	NotifySecretUpdated(userID int, secretID string, excludeSessionID string) error
+	NotifySecretDeleted(userID int, secretID string, excludeSessionID string) error
+}
+
 // Service содержит бизнес-логику для работы с секретами
 type Service struct {
-	repo Repository
+	repo            Repository
+	realtimeService RealtimeService // Опционально, может быть nil
 }
 
 // NewService создает новый экземпляр Service
@@ -14,6 +22,11 @@ func NewService(repo Repository) *Service {
 	}
 }
 
+// SetRealtimeService устанавливает сервис для отправки событий в реальном времени
+func (s *Service) SetRealtimeService(realtimeService RealtimeService) {
+	s.realtimeService = realtimeService
+}
+
 // SyncResponse представляет ответ для синхронизации
 type SyncResponse struct {
 	Secrets    []*Secret `json:"secrets"`     // Все измененные секреты (created/updated/deleted)
@@ -21,7 +34,8 @@ type SyncResponse struct {
 }
 
 // CreateSecret создает новый секрет для пользователя
-func (s *Service) CreateSecret(userID int, req *CreateSecretRequest) (*Secret, error) {
+// excludeSessionID - опциональный ID WebSocket сессии, которую нужно исключить из рассылки
+func (s *Service) CreateSecret(userID int, req *CreateSecretRequest, excludeSessionID string) (*Secret, error) {
 	// Валидация
 	if err := s.validateCreateRequest(req); err != nil {
 		return nil, err
@@ -39,6 +53,14 @@ func (s *Service) CreateSecret(userID int, req *CreateSecretRequest) (*Secret, e
 
 	if err := s.repo.CreateSecret(secret); err != nil {
 		return nil, WrapError(err, "не удалось создать секрет")
+	}
+
+	// Отправляем событие через WebSocket (если сервис настроен)
+	if s.realtimeService != nil {
+		if err := s.realtimeService.NotifySecretCreated(userID, secret.ID, excludeSessionID); err != nil {
+			// Логируем ошибку, но не прерываем выполнение
+			// Это graceful degradation - если WebSocket не работает, HTTP API продолжает работать
+		}
 	}
 
 	return secret, nil
@@ -70,7 +92,8 @@ func (s *Service) GetAllSecrets(userID int) ([]*Secret, error) {
 }
 
 // UpdateSecret обновляет существующий секрет
-func (s *Service) UpdateSecret(id string, userID int, req *UpdateSecretRequest) (*Secret, error) {
+// excludeSessionID - опциональный ID WebSocket сессии, которую нужно исключить из рассылки
+func (s *Service) UpdateSecret(id string, userID int, req *UpdateSecretRequest, excludeSessionID string) (*Secret, error) {
 	// Валидация
 	if err := s.validateUpdateRequest(req); err != nil {
 		return nil, err
@@ -98,12 +121,31 @@ func (s *Service) UpdateSecret(id string, userID int, req *UpdateSecretRequest) 
 		return nil, WrapError(err, "не удалось обновить секрет")
 	}
 
+	// Отправляем событие через WebSocket (если сервис настроен)
+	if s.realtimeService != nil {
+		if err := s.realtimeService.NotifySecretUpdated(userID, secret.ID, excludeSessionID); err != nil {
+			// Логируем ошибку, но не прерываем выполнение
+		}
+	}
+
 	return secret, nil
 }
 
 // DeleteSecret выполняет мягкое удаление секрета
-func (s *Service) DeleteSecret(id string, userID int) error {
-	return s.repo.SoftDeleteSecret(id, userID)
+// excludeSessionID - опциональный ID WebSocket сессии, которую нужно исключить из рассылки
+func (s *Service) DeleteSecret(id string, userID int, excludeSessionID string) error {
+	if err := s.repo.SoftDeleteSecret(id, userID); err != nil {
+		return err
+	}
+
+	// Отправляем событие через WebSocket (если сервис настроен)
+	if s.realtimeService != nil {
+		if err := s.realtimeService.NotifySecretDeleted(userID, id, excludeSessionID); err != nil {
+			// Логируем ошибку, но не прерываем выполнение
+		}
+	}
+
+	return nil
 }
 
 // GetSecretsForSync получает все секреты для синхронизации

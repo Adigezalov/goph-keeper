@@ -14,6 +14,7 @@ type UserContextKey string
 const (
 	UserIDKey    UserContextKey = "user_id"
 	UserEmailKey UserContextKey = "user_email"
+	SessionIDKey UserContextKey = "session_id" // ID WebSocket сессии (опционально)
 )
 
 // AuthMiddleware middleware для проверки авторизации
@@ -57,6 +58,12 @@ func (m *AuthMiddleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		// Добавляем данные пользователя в контекст
 		ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 		ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+
+		// Получаем sessionID из заголовка (если есть) - опционально для WebSocket идентификации
+		if sessionID := r.Header.Get("X-Session-ID"); sessionID != "" {
+			ctx = context.WithValue(ctx, SessionIDKey, sessionID)
+		}
+
 		r = r.WithContext(ctx)
 
 		// Передаем управление следующему обработчику
@@ -68,4 +75,10 @@ func (m *AuthMiddleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 func GetUserIDFromContext(ctx context.Context) (int, bool) {
 	userID, ok := ctx.Value(UserIDKey).(int)
 	return userID, ok
+}
+
+// GetSessionIDFromContext извлекает ID WebSocket сессии из контекста
+func GetSessionIDFromContext(ctx context.Context) (string, bool) {
+	sessionID, ok := ctx.Value(SessionIDKey).(string)
+	return sessionID, ok
 }

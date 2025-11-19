@@ -13,6 +13,7 @@ import (
 	"github.com/Adigezalov/goph-keeper/internal/config"
 	"github.com/Adigezalov/goph-keeper/internal/health"
 	"github.com/Adigezalov/goph-keeper/internal/middleware"
+	"github.com/Adigezalov/goph-keeper/internal/realtime"
 	"github.com/Adigezalov/goph-keeper/internal/repositories"
 	"github.com/Adigezalov/goph-keeper/internal/secret"
 	"github.com/Adigezalov/goph-keeper/internal/tokens"
@@ -72,6 +73,13 @@ func main() {
 
 		authMiddleware := middleware.NewAuthMiddleware(tokenService)
 
+		realtimeHub := realtime.NewHub()
+		realtimeService := realtime.NewService(realtimeHub)
+		realtimeHandler := realtime.NewHandler(realtimeHub, tokenService)
+		realtimeRoutes := api.PathPrefix("v1/realtime").Subrouter()
+
+		realtimeRoutes.HandleFunc("", realtimeHandler.HandleWebSocket)
+
 		healthService := health.NewService()
 		healthHandler := health.NewHandler(healthService)
 		healthRoutes := api.PathPrefix("/").Subrouter()
@@ -91,6 +99,7 @@ func main() {
 
 		secretRepo := secret.NewDatabaseRepository(dbRepo.GetDB())
 		secretService := secret.NewService(secretRepo)
+		secretService.SetRealtimeService(realtimeService)
 		secretHandler := secret.NewHandler(secretService)
 		secretRoutes := api.PathPrefix("/v1/secrets").Subrouter()
 
@@ -101,7 +110,6 @@ func main() {
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Update)).Methods("PUT")
 		secretRoutes.HandleFunc("/{id}", authMiddleware.RequireAuth(secretHandler.Delete)).Methods("DELETE")
 
-		// Chunked upload/download routes
 		secretRoutes.HandleFunc("/chunks/init", authMiddleware.RequireAuth(secretHandler.InitChunkedUpload)).Methods("POST")
 		secretRoutes.HandleFunc("/{id}/chunks", authMiddleware.RequireAuth(secretHandler.UploadChunk)).Methods("POST")
 		secretRoutes.HandleFunc("/{id}/chunks/finalize", authMiddleware.RequireAuth(secretHandler.FinalizeChunkedUpload)).Methods("POST")

@@ -15,11 +15,11 @@ import (
 
 // SecretService интерфейс для бизнес-логики секретов
 type SecretService interface {
-	CreateSecret(userID int, req *CreateSecretRequest) (*Secret, error)
+	CreateSecret(userID int, req *CreateSecretRequest, excludeSessionID string) (*Secret, error)
 	GetSecret(id string, userID int) (*Secret, error)
 	GetAllSecrets(userID int) ([]*Secret, error)
-	UpdateSecret(id string, userID int, req *UpdateSecretRequest) (*Secret, error)
-	DeleteSecret(id string, userID int) error
+	UpdateSecret(id string, userID int, req *UpdateSecretRequest, excludeSessionID string) (*Secret, error)
+	DeleteSecret(id string, userID int, excludeSessionID string) error
 	GetSecretsForSync(userID int, since *time.Time) (*SyncResponse, error)
 }
 
@@ -46,6 +46,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Получаем sessionID из контекста (если есть) для исключения из WebSocket рассылки
+	var excludeSessionID string
+	if sessionID, ok := middleware.GetSessionIDFromContext(r.Context()); ok {
+		excludeSessionID = sessionID
+	}
+
 	var req CreateSecretRequest
 
 	// Декодируем JSON запрос
@@ -55,7 +61,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создаем секрет
-	secret, err := h.service.CreateSecret(userID, &req)
+	secret, err := h.service.CreateSecret(userID, &req, excludeSessionID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrLoginRequired),
@@ -157,6 +163,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Получаем sessionID из контекста (если есть) для исключения из WebSocket рассылки
+	var excludeSessionID string
+	if sessionID, ok := middleware.GetSessionIDFromContext(r.Context()); ok {
+		excludeSessionID = sessionID
+	}
+
 	// Получаем ID секрета из URL
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -174,7 +186,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Обновляем секрет
-	secret, err := h.service.UpdateSecret(id, userID, &req)
+	secret, err := h.service.UpdateSecret(id, userID, &req, excludeSessionID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSecretNotFound):
@@ -212,6 +224,12 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Получаем sessionID из контекста (если есть) для исключения из WebSocket рассылки
+	var excludeSessionID string
+	if sessionID, ok := middleware.GetSessionIDFromContext(r.Context()); ok {
+		excludeSessionID = sessionID
+	}
+
 	// Получаем ID секрета из URL
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -221,7 +239,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Удаляем секрет
-	err := h.service.DeleteSecret(id, userID)
+	err := h.service.DeleteSecret(id, userID, excludeSessionID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSecretNotFound):
@@ -424,6 +442,12 @@ func (h *Handler) FinalizeChunkedUpload(w http.ResponseWriter, r *http.Request) 
 		metadata[k] = v
 	}
 
+	// Получаем sessionID из контекста (если есть) для исключения из WebSocket рассылки
+	var excludeSessionID string
+	if sessionID, ok := middleware.GetSessionIDFromContext(r.Context()); ok {
+		excludeSessionID = sessionID
+	}
+
 	// Создаем или обновляем секрет
 	createReq := &CreateSecretRequest{
 		Login:      req.Login,
@@ -442,10 +466,10 @@ func (h *Handler) FinalizeChunkedUpload(w http.ResponseWriter, r *http.Request) 
 			BinaryData: binaryData,
 			Version:    *req.Version,
 		}
-		secret, err = h.service.UpdateSecret(secretID, userID, updateReq)
+		secret, err = h.service.UpdateSecret(secretID, userID, updateReq, excludeSessionID)
 	} else {
 		// Создание нового секрета
-		secret, err = h.service.CreateSecret(userID, createReq)
+		secret, err = h.service.CreateSecret(userID, createReq, excludeSessionID)
 	}
 
 	if err != nil {
