@@ -28,6 +28,24 @@ func NewHub() *Hub {
 		melody:      m,
 	}
 
+	// Обработчик подключения клиента
+	m.HandleConnect(func(s *melody.Session) {
+		// Получаем userID и sessionID из keys, переданных при подключении
+		userIDValue, exists := s.Keys["user_id"]
+		if !exists {
+			log.Printf("[Realtime] Ошибка: user_id не найден в keys сессии")
+			return
+		}
+
+		userID, ok := userIDValue.(int)
+		if !ok {
+			log.Printf("[Realtime] Ошибка: неверный тип user_id в keys сессии")
+			return
+		}
+
+		hub.RegisterSession(userID, s)
+	})
+
 	// Обработчик отключения клиента
 	m.HandleDisconnect(func(s *melody.Session) {
 		hub.unregisterSession(s)

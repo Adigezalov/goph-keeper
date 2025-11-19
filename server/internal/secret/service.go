@@ -1,6 +1,9 @@
 package secret
 
-import "time"
+import (
+	"log"
+	"time"
+)
 
 // RealtimeService интерфейс для отправки событий в реальном времени (опционально)
 type RealtimeService interface {
@@ -57,10 +60,16 @@ func (s *Service) CreateSecret(userID int, req *CreateSecretRequest, excludeSess
 
 	// Отправляем событие через WebSocket (если сервис настроен)
 	if s.realtimeService != nil {
+		log.Printf("[Secret] Отправка события создания секрета: userID=%d, secretID=%s, excludeSessionID=%s", userID, secret.ID, excludeSessionID)
 		if err := s.realtimeService.NotifySecretCreated(userID, secret.ID, excludeSessionID); err != nil {
+			log.Printf("[Secret] Ошибка отправки события через WebSocket: %v", err)
 			// Логируем ошибку, но не прерываем выполнение
 			// Это graceful degradation - если WebSocket не работает, HTTP API продолжает работать
+		} else {
+			log.Printf("[Secret] Событие успешно отправлено через WebSocket")
 		}
+	} else {
+		log.Printf("[Secret] RealtimeService не настроен, событие не отправлено")
 	}
 
 	return secret, nil

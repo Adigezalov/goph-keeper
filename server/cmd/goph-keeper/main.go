@@ -42,14 +42,24 @@ func main() {
 
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Проверяем, является ли это WebSocket upgrade запросом
+			isWebSocket := r.Header.Get("Upgrade") == "websocket"
+
 			origin := r.Header.Get("Origin")
 			if origin == "" {
 				origin = "http://localhost:3000"
 			}
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Session-ID")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+			// Для WebSocket upgrade не устанавливаем заголовки после upgrade
+			if isWebSocket {
+				// Для WebSocket просто пропускаем дальше
+				next.ServeHTTP(w, r)
+				return
+			}
 
 			// Обработка preflight запросов
 			if r.Method == "OPTIONS" {
@@ -76,9 +86,9 @@ func main() {
 		realtimeHub := realtime.NewHub()
 		realtimeService := realtime.NewService(realtimeHub)
 		realtimeHandler := realtime.NewHandler(realtimeHub, tokenService)
-		realtimeRoutes := api.PathPrefix("v1/realtime").Subrouter()
 
-		realtimeRoutes.HandleFunc("", realtimeHandler.HandleWebSocket)
+		// WebSocket endpoint для realtime уведомлений
+		api.HandleFunc("/v1/realtime", realtimeHandler.HandleWebSocket)
 
 		healthService := health.NewService()
 		healthHandler := health.NewHandler(healthService)

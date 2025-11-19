@@ -27,6 +27,8 @@ func NewHandler(hub *Hub, tokenService *tokens.Service) *Handler {
 
 // HandleWebSocket обрабатывает WebSocket подключение
 func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[Realtime] Получен запрос на WebSocket подключение: %s %s", r.Method, r.URL.String())
+
 	// Получаем токен из query параметра или заголовка
 	tokenString := r.URL.Query().Get("token")
 	if tokenString == "" {
@@ -41,6 +43,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if tokenString == "" {
+		log.Printf("[Realtime] Ошибка: токен не предоставлен")
 		http.Error(w, "Токен не предоставлен", http.StatusUnauthorized)
 		return
 	}
@@ -48,32 +51,29 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Валидируем токен
 	claims, err := h.tokenService.ValidateAccessToken(tokenString)
 	if err != nil {
+		log.Printf("[Realtime] Ошибка валидации токена: %v", err)
 		http.Error(w, "Неверный токен: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 
 	userID := claims.UserID
+	sessionID := r.URL.Query().Get("session_id")
+	log.Printf("[Realtime] Валидация токена успешна, userID=%d, sessionID=%s", userID, sessionID)
 
-	// Обработчик подключения - регистрируем сессию
-	handleConnect := func(s *melody.Session) {
-		h.hub.RegisterSession(userID, s)
-		log.Printf("[Realtime] Подключен WebSocket для userID=%d", userID)
-	}
+	// Сохраняем userID и sessionID в контексте запроса для использования в обработчиках
+	keys := make(map[string]interface{})
+	keys["user_id"] = userID
+	keys["session_id"] = sessionID
 
-	// Обработчик сообщений от клиента (если нужно будет двустороннее общение)
-	handleMessage := func(s *melody.Session, msg []byte) {
-		// Пока клиент только получает события, но можно добавить обработку команд
-		log.Printf("[Realtime] Получено сообщение от userID=%d: %s", userID, string(msg))
-	}
-
-	// Настраиваем обработчики
+	// Получаем Melody instance
 	m := h.hub.GetMelody()
-	m.HandleConnect(handleConnect)
-	m.HandleMessage(handleMessage)
 
-	// Обновляем WebSocket соединение
-	if err := m.HandleRequestWithKeys(w, r, nil); err != nil {
+	// Обновляем WebSocket соединение с ключами
+	log.Printf("[Realtime] Выполняем WebSocket upgrade для userID=%d", userID)
+	if err := m.HandleRequestWithKeys(w, r, keys); err != nil {
 		log.Printf("[Realtime] Ошибка обработки WebSocket запроса: %v", err)
+	} else {
+		log.Printf("[Realtime] WebSocket upgrade успешен для userID=%d", userID)
 	}
 }
 

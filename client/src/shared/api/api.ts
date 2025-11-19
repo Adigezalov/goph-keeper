@@ -7,6 +7,7 @@ import { TOAST_SEVERITY } from '@shared/uikit/toast'
 
 import { REFRESH } from '../constants'
 import { getAccessToken, removeTokens, setTokens } from '../tokens'
+import { getRealtimeSessionID } from '../realtime'
 
 let isRefreshing = false
 let failedQueue: Array<{
@@ -36,6 +37,12 @@ api.interceptors.request.use(
 
 		config.headers['Authorization'] = `Bearer ${token}`
 		config.headers['Content-Type'] = 'application/json'
+
+		// Добавляем sessionID для исключения из WebSocket рассылки
+		const sessionID = getRealtimeSessionID()
+		if (sessionID) {
+			config.headers['X-Session-ID'] = sessionID
+		}
 
 		return config
 	},

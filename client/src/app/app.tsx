@@ -7,6 +7,7 @@ import { registerServiceWorker } from '@shared/service-worker'
 
 import {
 	LocalizationProvider,
+	RealtimeProvider,
 	StoreProvider,
 	StyleProvider,
 	ToastNotificationProvider,
@@ -31,7 +32,9 @@ export const App = () => {
 					<StoreProvider>
 						<PrimeReactProvider>
 							<ToastNotificationProvider>
-								<AppRouter />
+								<RealtimeProvider>
+									<AppRouter />
+								</RealtimeProvider>
 							</ToastNotificationProvider>
 						</PrimeReactProvider>
 					</StoreProvider>

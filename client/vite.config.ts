@@ -12,6 +12,18 @@ export default defineConfig({
 				target: 'http://localhost:8080',
 				changeOrigin: true,
 				secure: false,
+				ws: true, // Включаем поддержку WebSocket
+				configure: (proxy, _options) => {
+					proxy.on('error', (err, _req, _res) => {
+						console.log('proxy error', err)
+					})
+					proxy.on('proxyReqWs', (proxyReq, req, socket) => {
+						console.log('WebSocket proxy request:', req.url)
+					})
+					proxy.on('proxyReq', (proxyReq, req, res) => {
+						console.log('HTTP proxy request:', req.method, req.url)
+					})
+				},
 			},
 		},
 	},
