@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 )
 
 type DatabaseRepository struct {
@@ -14,7 +14,7 @@ type DatabaseRepository struct {
 }
 
 func NewDatabaseRepository(dsn string) (*DatabaseRepository, error) {
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("не удалось открыть базу данных: %w", err)
 	}
@@ -23,7 +23,7 @@ func NewDatabaseRepository(dsn string) (*DatabaseRepository, error) {
 		return nil, fmt.Errorf("не удалось подключиться к базе данных: %w", err)
 	}
 
-	dbx := sqlx.NewDb(db, "postgres")
+	dbx := sqlx.NewDb(db, "pgx")
 
 	return &DatabaseRepository{db: db, dbx: dbx}, nil
 }

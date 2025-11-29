@@ -1,4 +1,4 @@
-.PHONY: help migrate-up migrate-down migrate-status build-server build-migrate build run-server run-migrate-up run-migrate-down run-migrate-status clean test test-coverage test-verbose deps setup start migrate-up-bin migrate-down-bin migrate-status-bin fmt vet lint client-install client-dev client-build client-lint client-tsc client-clean dev-all
+.PHONY: help migrate-up migrate-down migrate-status build-server build-migrate build run-server run-migrate-up run-migrate-down run-migrate-status clean test test-coverage test-verbose deps setup start migrate-up-bin migrate-down-bin migrate-status-bin fmt vet lint client-install client-dev client-build client-lint client-tsc client-clean dev-all generate-tls-cert
 
 # Переменные
 SERVER_DIR := server
@@ -12,6 +12,8 @@ BIN_DIR := bin
 DATABASE_URI ?= postgres://user:password@localhost:5432/keeper?sslmode=disable
 RUN_ADDRESS ?= :8080
 JWT_SECRET ?= your-secret-key-change-in-production
+TLS_CERT_FILE ?= certs/server.crt
+TLS_KEY_FILE ?= certs/server.key
 
 help: ## Показать справку по командам
 	@echo "Доступные команды:"
@@ -50,7 +52,7 @@ build: build-server build-migrate ## Собрать все (сервер и ут
 # Запуск
 run-server: ## Запустить сервер
 	@echo "Запуск сервера..."
-	@cd $(SERVER_DIR) && DATABASE_URI="$(DATABASE_URI)" RUN_ADDRESS="$(RUN_ADDRESS)" JWT_SECRET="$(JWT_SECRET)" go run cmd/goph-keeper/main.go
+	@cd $(SERVER_DIR) && DATABASE_URI="$(DATABASE_URI)" RUN_ADDRESS="$(RUN_ADDRESS)" JWT_SECRET="$(JWT_SECRET)" TLS_CERT_FILE="$(TLS_CERT_FILE)" TLS_KEY_FILE="$(TLS_KEY_FILE)" go run cmd/goph-keeper/main.go
 
 run-migrate-up: ## Запустить миграции (up)
 	@cd $(SERVER_DIR) && DATABASE_URI="$(DATABASE_URI)" go run cmd/migrate/main.go -command=up -path=migrations
@@ -98,7 +100,17 @@ setup: deps migrate-up ## Установить зависимости и при�
 
 start: build-server ## Собрать и запустить сервер из бинарника
 	@echo "Запуск собранного сервера..."
-	@DATABASE_URI="$(DATABASE_URI)" RUN_ADDRESS="$(RUN_ADDRESS)" JWT_SECRET="$(JWT_SECRET)" ./$(BIN_DIR)/goph-keeper
+	@DATABASE_URI="$(DATABASE_URI)" RUN_ADDRESS="$(RUN_ADDRESS)" JWT_SECRET="$(JWT_SECRET)" TLS_CERT_FILE="$(SERVER_DIR)/$(TLS_CERT_FILE)" TLS_KEY_FILE="$(SERVER_DIR)/$(TLS_KEY_FILE)" ./$(BIN_DIR)/goph-keeper
+
+generate-tls-cert: ## Сгенерировать самоподписанный TLS сертификат для разработки
+	@echo "Генерация самоподписанного TLS сертификата для разработки..."
+	@mkdir -p $(SERVER_DIR)/certs
+	@openssl req -x509 -newkey rsa:4096 -keyout $(SERVER_DIR)/certs/server.key -out $(SERVER_DIR)/certs/server.crt -days 365 -nodes -subj "/C=RU/ST=State/L=City/O=Goph-Keeper/CN=localhost"
+	@chmod 600 $(SERVER_DIR)/certs/server.key
+	@chmod 644 $(SERVER_DIR)/certs/server.crt
+	@echo "Сертификат создан: $(SERVER_DIR)/certs/server.crt"
+	@echo "Ключ создан: $(SERVER_DIR)/certs/server.key"
+	@echo "ВНИМАНИЕ: Это самоподписанный сертификат только для разработки!"
 
 # Использование собранных бинарников
 migrate-up-bin: build-migrate ## Применить миграции используя собранный бинарник

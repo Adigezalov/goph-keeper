@@ -3,14 +3,14 @@ package migrations
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
-	_ "github.com/lib/pq"
+	"github.com/Adigezalov/goph-keeper/internal/logger"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type Service struct {
@@ -40,7 +40,7 @@ type MigrationStatus struct {
 }
 
 func (s *Service) Apply() error {
-	log.Println("Начинаем применение миграций...")
+	logger.Info("[Migrations] Начинаем применение миграций...")
 
 	if err := s.createMigrationsTable(); err != nil {
 		return fmt.Errorf("не удалось создать таблицу миграций: %w", err)
@@ -59,11 +59,17 @@ func (s *Service) Apply() error {
 	appliedCount := 0
 	for _, migration := range migrations {
 		if appliedVersions[migration.Version] {
-			log.Printf("Миграция %d (%s) уже применена, пропускаем", migration.Version, migration.Name)
+			logger.Log.WithFields(map[string]interface{}{
+				"version": migration.Version,
+				"name":    migration.Name,
+			}).Info("[Migrations] Миграция уже применена, пропускаем")
 			continue
 		}
 
-		log.Printf("Применяем миграцию %d (%s)...", migration.Version, migration.Name)
+		logger.Log.WithFields(map[string]interface{}{
+			"version": migration.Version,
+			"name":    migration.Name,
+		}).Info("[Migrations] Применяем миграцию")
 		if err := s.applyMigration(migration); err != nil {
 			return fmt.Errorf("ошибка применения миграции %d (%s): %w", migration.Version, migration.Name, err)
 		}
@@ -72,14 +78,19 @@ func (s *Service) Apply() error {
 			return fmt.Errorf("не удалось отметить миграцию %d как примененную: %w", migration.Version, err)
 		}
 
-		log.Printf("Миграция %d (%s) успешно применена", migration.Version, migration.Name)
+		logger.Log.WithFields(map[string]interface{}{
+			"version": migration.Version,
+			"name":    migration.Name,
+		}).Info("[Migrations] Миграция успешно применена")
 		appliedCount++
 	}
 
 	if appliedCount == 0 {
-		log.Println("Все миграции уже применены")
+		logger.Info("[Migrations] Все миграции уже применены")
 	} else {
-		log.Printf("Применено миграций: %d", appliedCount)
+		logger.Log.WithFields(map[string]interface{}{
+			"applied_count": appliedCount,
+		}).Info("[Migrations] Применено миграций")
 	}
 
 	return nil
@@ -126,7 +137,10 @@ func (s *Service) loadMigrations() ([]Migration, error) {
 
 		version, err := strconv.Atoi(parts[0])
 		if err != nil {
-			log.Printf("Предупреждение: не удалось распарсить версию из файла %s, пропускаем", filename)
+			logger.Log.WithFields(map[string]interface{}{
+				"filename": filename,
+				"error":    err.Error(),
+			}).Warn("[Migrations] Не удалось распарсить версию из файла, пропускаем")
 			continue
 		}
 
@@ -161,7 +175,10 @@ func (s *Service) loadMigrations() ([]Migration, error) {
 
 		version, err := strconv.Atoi(parts[0])
 		if err != nil {
-			log.Printf("Предупреждение: не удалось распарсить версию из файла %s, пропускаем", filename)
+			logger.Log.WithFields(map[string]interface{}{
+				"filename": filename,
+				"error":    err.Error(),
+			}).Warn("[Migrations] Не удалось распарсить версию из файла, пропускаем")
 			continue
 		}
 
@@ -204,7 +221,9 @@ func (s *Service) getAppliedVersions() (map[int]bool, error) {
 	defer func(rows *sql.Rows) {
 		if rows != nil {
 			if err := rows.Close(); err != nil {
-				fmt.Println("close rows err:", err)
+				logger.Log.WithFields(map[string]interface{}{
+					"error": err.Error(),
+				}).Error("[Migrations] Ошибка закрытия rows")
 			}
 		}
 	}(rows)
@@ -229,7 +248,9 @@ func (s *Service) applyMigration(migration Migration) error {
 	defer func(tx *sql.Tx) {
 		err := tx.Rollback()
 		if err != nil {
-			fmt.Println("rollback:", err)
+			logger.Log.WithFields(map[string]interface{}{
+				"error": err.Error(),
+			}).Error("[Migrations] Ошибка rollback транзакции")
 		}
 	}(tx)
 
@@ -255,7 +276,7 @@ func (s *Service) markAsApplied(version int, name string) error {
 }
 
 func (s *Service) Down() error {
-	log.Println("Начинаем откат миграций...")
+	logger.Info("[Migrations] Начинаем откат миграций...")
 
 	if err := s.createMigrationsTable(); err != nil {
 		return fmt.Errorf("не удалось создать таблицу миграций: %w", err)
@@ -292,7 +313,10 @@ func (s *Service) Down() error {
 		return fmt.Errorf("для миграции %d (%s) не найден файл отката", version, name)
 	}
 
-	log.Printf("Откатываем миграцию %d (%s)...", version, name)
+	logger.Log.WithFields(map[string]interface{}{
+		"version": version,
+		"name":    name,
+	}).Info("[Migrations] Откатываем миграцию")
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -301,7 +325,9 @@ func (s *Service) Down() error {
 	defer func(tx *sql.Tx) {
 		err := tx.Rollback()
 		if err != nil {
-			fmt.Println("rollback:", err)
+			logger.Log.WithFields(map[string]interface{}{
+				"error": err.Error(),
+			}).Error("[Migrations] Ошибка rollback транзакции")
 		}
 	}(tx)
 
@@ -317,7 +343,10 @@ func (s *Service) Down() error {
 		return fmt.Errorf("не удалось зафиксировать транзакцию: %w", err)
 	}
 
-	log.Printf("Миграция %d (%s) успешно откачена", version, name)
+	logger.Log.WithFields(map[string]interface{}{
+		"version": version,
+		"name":    name,
+	}).Info("[Migrations] Миграция успешно откачена")
 	return nil
 }
 
@@ -338,7 +367,9 @@ func (s *Service) Status() ([]MigrationStatus, error) {
 	defer func(rows *sql.Rows) {
 		if rows != nil {
 			if err := rows.Close(); err != nil {
-				fmt.Println("close rows:", err)
+				logger.Log.WithFields(map[string]interface{}{
+					"error": err.Error(),
+				}).Error("[Migrations] Ошибка закрытия rows")
 			}
 		}
 	}(rows)

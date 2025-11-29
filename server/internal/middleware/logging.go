@@ -8,7 +8,6 @@ import (
 
 	"github.com/Adigezalov/goph-keeper/internal/logger"
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 )
 
 type responseWriter struct {
@@ -67,7 +66,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 		userID, _ := GetUserIDFromContext(r.Context())
 		sessionID, _ := GetSessionIDFromContext(r.Context())
 
-		logger.Log.WithFields(logrus.Fields{
+		logger.Log.WithFields(map[string]interface{}{
 			"method":     r.Method,
 			"path":       path,
 			"remote":     r.RemoteAddr,
@@ -82,7 +81,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		fields := logrus.Fields{
+		fields := map[string]interface{}{
 			"method":     r.Method,
 			"path":       path,
 			"status":     rw.statusCode,

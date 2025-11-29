@@ -34,6 +34,10 @@ type SyncResponse struct {
 
 func (s *Service) CreateSecret(userID int, req *CreateSecretRequest, excludeSessionID string) (*Secret, error) {
 	if err := s.validateCreateRequest(req); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id": userID,
+			"error":   err.Error(),
+		}).Warn("[Secret] Ошибка валидации запроса на создание секрета")
 		return nil, err
 	}
 
@@ -47,6 +51,10 @@ func (s *Service) CreateSecret(userID int, req *CreateSecretRequest, excludeSess
 	}
 
 	if err := s.repo.CreateSecret(secret); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id": userID,
+			"error":   err.Error(),
+		}).Error("[Secret] Ошибка создания секрета в репозитории")
 		return nil, WrapError(err, "не удалось создать секрет")
 	}
 
@@ -78,6 +86,11 @@ func (s *Service) CreateSecret(userID int, req *CreateSecretRequest, excludeSess
 func (s *Service) GetSecret(id string, userID int) (*Secret, error) {
 	secret, err := s.repo.GetSecretByID(id, userID)
 	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id":   userID,
+			"secret_id": id,
+			"error":     err.Error(),
+		}).Error("[Secret] Ошибка получения секрета из репозитория")
 		return nil, err
 	}
 
@@ -87,6 +100,10 @@ func (s *Service) GetSecret(id string, userID int) (*Secret, error) {
 func (s *Service) GetAllSecrets(userID int) ([]*Secret, error) {
 	secrets, err := s.repo.GetSecretsByUserID(userID)
 	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id": userID,
+			"error":   err.Error(),
+		}).Error("[Secret] Ошибка получения всех секретов пользователя из репозитория")
 		return nil, err
 	}
 
@@ -99,15 +116,31 @@ func (s *Service) GetAllSecrets(userID int) ([]*Secret, error) {
 
 func (s *Service) UpdateSecret(id string, userID int, req *UpdateSecretRequest, excludeSessionID string) (*Secret, error) {
 	if err := s.validateUpdateRequest(req); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id":   userID,
+			"secret_id": id,
+			"error":     err.Error(),
+		}).Warn("[Secret] Ошибка валидации запроса на обновление секрета")
 		return nil, err
 	}
 
 	secret, err := s.repo.GetSecretByID(id, userID)
 	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id":   userID,
+			"secret_id": id,
+			"error":     err.Error(),
+		}).Error("[Secret] Ошибка получения секрета для обновления из репозитория")
 		return nil, err
 	}
 
 	if secret.Version != req.Version {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id":         userID,
+			"secret_id":       secret.ID,
+			"current_version": secret.Version,
+			"request_version": req.Version,
+		}).Warn("[Secret] Конфликт версий при обновлении секрета")
 		return nil, ErrVersionConflict
 	}
 
@@ -117,11 +150,31 @@ func (s *Service) UpdateSecret(id string, userID int, req *UpdateSecretRequest, 
 	secret.BinaryData = req.BinaryData
 
 	if err := s.repo.UpdateSecret(secret); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id":   userID,
+			"secret_id": secret.ID,
+			"error":     err.Error(),
+		}).Error("[Secret] Ошибка обновления секрета в репозитории")
 		return nil, WrapError(err, "не удалось обновить секрет")
 	}
 
 	if s.realtimeService != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id":         userID,
+			"secret_id":       secret.ID,
+			"exclude_session": excludeSessionID,
+		}).Info("[Secret] Отправка события обновления секрета")
 		if err := s.realtimeService.NotifySecretUpdated(userID, secret.ID, excludeSessionID); err != nil {
+			logger.Log.WithFields(map[string]interface{}{
+				"user_id":   userID,
+				"secret_id": secret.ID,
+				"error":     err.Error(),
+			}).Error("[Secret] Ошибка отправки события обновления через WebSocket")
+		} else {
+			logger.Log.WithFields(map[string]interface{}{
+				"user_id":   userID,
+				"secret_id": secret.ID,
+			}).Info("[Secret] Событие обновления успешно отправлено через WebSocket")
 		}
 	}
 
@@ -130,11 +183,31 @@ func (s *Service) UpdateSecret(id string, userID int, req *UpdateSecretRequest, 
 
 func (s *Service) DeleteSecret(id string, userID int, excludeSessionID string) error {
 	if err := s.repo.SoftDeleteSecret(id, userID); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id":   userID,
+			"secret_id": id,
+			"error":     err.Error(),
+		}).Error("[Secret] Ошибка удаления секрета из репозитория")
 		return err
 	}
 
 	if s.realtimeService != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id":         userID,
+			"secret_id":       id,
+			"exclude_session": excludeSessionID,
+		}).Info("[Secret] Отправка события удаления секрета")
 		if err := s.realtimeService.NotifySecretDeleted(userID, id, excludeSessionID); err != nil {
+			logger.Log.WithFields(map[string]interface{}{
+				"user_id":   userID,
+				"secret_id": id,
+				"error":     err.Error(),
+			}).Error("[Secret] Ошибка отправки события удаления через WebSocket")
+		} else {
+			logger.Log.WithFields(map[string]interface{}{
+				"user_id":   userID,
+				"secret_id": id,
+			}).Info("[Secret] Событие удаления успешно отправлено через WebSocket")
 		}
 	}
 
@@ -152,6 +225,11 @@ func (s *Service) GetSecretsForSync(userID int, since *time.Time) (*SyncResponse
 	}
 
 	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"user_id": userID,
+			"since":   since,
+			"error":   err.Error(),
+		}).Error("[Secret] Ошибка получения секретов для синхронизации из репозитория")
 		return nil, WrapError(err, "не удалось получить секреты для синхронизации")
 	}
 

@@ -1,14 +1,14 @@
 -- Включаем расширение для работы с UUID (если еще не включено)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Создание таблицы секретов (зашифрованные данные пользователей)
+-- Создание таблицы секретов
 CREATE TABLE IF NOT EXISTS secrets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    login TEXT NOT NULL,                     -- Зашифрованный логин (base64)
-    password TEXT NOT NULL,                  -- Зашифрованный пароль (base64)
-    metadata JSONB,                          -- Незашифрованные метаданные (fileName, app и т.д.)
-    binary_data BYTEA,                       -- Зашифрованные бинарные данные (файлы)
+    login TEXT NOT NULL,                     -- Логин (base64)
+    password TEXT NOT NULL,                  -- Пароль (base64)
+    metadata JSONB,                          -- Метаданные (fileName, app и т.д.)
+    binary_data BYTEA,                       -- Бинарные данные (файлы)
     version INTEGER NOT NULL DEFAULT 1,      -- Версия для разрешения конфликтов синхронизации
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

@@ -1,6 +1,6 @@
 -- Создание таблицы кодов подтверждения email
 CREATE TABLE IF NOT EXISTS email_verification_codes (
-    id SERIAL PRIMARY KEY,
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     code VARCHAR(6) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

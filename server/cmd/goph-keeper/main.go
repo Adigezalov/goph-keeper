@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -97,8 +96,8 @@ func main() {
 
 	api := router.PathPrefix("/api").Subrouter()
 
-	_, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	if dbRepo != nil {
 		tokenRepo := tokens.NewDatabaseRepository(dbRepo.GetDB())
@@ -182,22 +181,20 @@ func main() {
 		Handler: router,
 	}
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
-		logger.Infof("Сервер запущен на %s", cfg.ServerAddress)
+		logger.Infof("Сервер запущен на %s (TLS)", cfg.ServerAddress)
 		logger.Infof("База данных: %s", cfg.DatabaseURI)
+		logger.Infof("TLS сертификат: %s", cfg.TLSCertFile)
+		logger.Infof("TLS ключ: %s", cfg.TLSKeyFile)
 
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatalf("Ошибка запуска сервера: %v", err)
 		}
 	}()
 
-	<-sigChan
+	// Ожидаем сигнал завершения через контекст
+	<-ctx.Done()
 	logger.Info("Получен сигнал завершения, останавливаем сервер...")
-
-	cancel()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()

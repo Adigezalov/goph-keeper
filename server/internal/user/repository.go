@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Repository interface {
@@ -32,8 +32,8 @@ func (r *DatabaseRepository) CreateUser(user *User) error {
 		&user.ID, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
-		var pqErr *pq.Error
-		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return ErrUserAlreadyExists
 		}
 		return WrapError(err, "не удалось создать пользователя")

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Adigezalov/goph-keeper/internal/logger"
 	"github.com/google/uuid"
 )
 
@@ -28,7 +29,13 @@ func (s *ChunkedUploadService) InitUpload(userID string, totalChunks int, totalS
 	uploadID := uuid.New().String()
 	secretID := uuid.New().String()
 
-	fmt.Printf("[ChunkedUpload] InitUpload - userID: %s, totalChunks: %d, totalSize: %d\n", userID, totalChunks, totalSize)
+	logger.Log.WithFields(map[string]interface{}{
+		"user_id":      userID,
+		"upload_id":    uploadID,
+		"secret_id":    secretID,
+		"total_chunks": totalChunks,
+		"total_size":   totalSize,
+	}).Info("[ChunkedUpload] Инициализация загрузки")
 
 	session := &ChunkedUploadSession{
 		UploadID:    uploadID,
