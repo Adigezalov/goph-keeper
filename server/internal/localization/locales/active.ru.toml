@@ -1,0 +1,126 @@
+[user.already_exists]
+other = "Пользователь уже существует"
+
+[user.not_found]
+other = "Пользователь не найден"
+
+[user.invalid_email]
+other = "Неверный формат email"
+
+[user.email_required]
+other = "Email обязателен"
+
+[user.password_required]
+other = "Пароль обязателен"
+
+[user.password_too_short]
+other = "Пароль должен содержать минимум 6 символов"
+
+[user.invalid_credentials]
+other = "Неверная пара email/пароль"
+
+[user.refresh_token_missing]
+other = "Refresh токен отсутствует"
+
+[user.invalid_refresh_token]
+other = "Недействительный refresh токен"
+
+[user.request_required]
+other = "Запрос обязателен"
+
+[user.email_already_taken]
+other = "Email уже занят"
+
+[user.email_not_verified]
+other = "Email не подтвержден. Проверьте почту и введите код подтверждения"
+
+[verification.code_not_found]
+other = "Код верификации не найден"
+
+[verification.code_expired]
+other = "Срок действия кода истек. Запросите новый код"
+
+[verification.code_already_used]
+other = "Код уже был использован"
+
+[verification.invalid_code]
+other = "Неверный код верификации"
+
+[verification.email_required]
+other = "Email обязателен"
+
+[verification.code_required]
+other = "Код обязателен"
+
+[verification.request_required]
+other = "Запрос обязателен"
+
+[secret.not_found]
+other = "Секрет не найден"
+
+[secret.version_conflict]
+other = "Конфликт версий: секрет был изменен другим устройством"
+
+[secret.version_conflict_detailed]
+other = "Конфликт версий: секрет был изменен на другом устройстве"
+
+[secret.request_required]
+other = "Запрос обязателен"
+
+[secret.login_required]
+other = "Логин обязателен"
+
+[secret.password_required]
+other = "Пароль обязателен"
+
+[secret.id_required]
+other = "ID секрета обязателен"
+
+[secret.chunk_index_invalid]
+other = "Неверный индекс чанка"
+
+[secret.session_not_found]
+other = "Сессия не найдена или истекла"
+
+[secret.session_not_found_simple]
+other = "Сессия не найдена"
+
+[secret.access_denied]
+other = "Доступ запрещен"
+
+[secret.invalid_secret_id]
+other = "Неверный ID секрета"
+
+[secret.chunk_upload_error]
+other = "Ошибка загрузки чанка"
+
+[secret.chunks_not_complete]
+other = "Не все чанки загружены"
+
+[common.invalid_request_format]
+other = "Неверный формат запроса"
+
+[common.internal_error]
+other = "Внутренняя ошибка сервера"
+
+[common.authorization_error]
+other = "Ошибка авторизации"
+
+[common.invalid_since_format]
+other = "Неверный формат параметра since (ожидается RFC3339)"
+
+[auth.missing_authorization_header]
+other = "Ошибка авторизации: отсутствует заголовок Authorization"
+
+[auth.invalid_token_format]
+other = "Ошибка авторизации: неверный формат токена"
+
+[auth.invalid_token]
+other = "Ошибка авторизации: {{.Error}}"
+
+[realtime.token_not_provided]
+other = "Токен не предоставлен"
+
+[realtime.invalid_token]
+other = "Неверный токен: {{.Error}}"
+
