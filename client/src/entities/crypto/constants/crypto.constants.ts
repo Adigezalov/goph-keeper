@@ -1,0 +1,1 @@
+export const LOCAL_CRYPTO_KEY_NAME = '@CRYPTO_KEY'

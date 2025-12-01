@@ -1,0 +1,52 @@
+.root
+  height: 37px
+  display: flex
+  align-items: center
+  justify-content: center
+  gap: 10px
+  border-radius: 10px
+  box-shadow: none
+  font: var(--font-16-regular-120)
+
+  & > span
+    flex-grow: 0
+    font: var(--font-14-regular-100)
+
+  &.green
+    background-color: var(--accent-color)
+    border-color: var(--accent-color)
+    &:hover
+      background-color: var(--accent-hover-color)
+
+  &.grey
+    background-color: var(--buttons-color)
+    border-color: var(--buttons-color)
+    color: var(--main-color)
+    &:hover
+      background-color: var(--buttons-hover-color)
+      border-color: var(--buttons-hover-color)
+
+  &.white
+    background-color: var(--white-color)
+    border-color: var(--white-color)
+    color: var(--main-color)
+    &:hover
+      background-color: var(--hover-color)
+      border-color: var(--hover-color)
+
+  &.red
+    background-color: var(--red-color)
+    border-color: var(--red-color)
+    color: var(--white-color)
+    &:hover
+      background-color: var(--red-color-hover)
+      border-color: var(--red-color-hover)
+
+  &.transparent
+    background-color: transparent
+    color: var(--text-color)
+    &:hover
+      background-color: var(--hover-color)
+
+  &.full
+    width: 100%
